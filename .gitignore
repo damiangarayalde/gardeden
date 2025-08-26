@@ -1,2 +1,28 @@
 /.venv
 /__pycache__
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+venv/
+env/
+*.egg-info/
+
+# VS Code
+.vscode/
+
+# Mac OS
+.DS_Store
+
+# Pygame window screenshots
+*.bmp
+*.png
+
+# Logs
+*.log
+
+# Other
+*.swp
+*.bak
