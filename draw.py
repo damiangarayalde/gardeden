@@ -121,3 +121,22 @@ class CartDrawer:
         tip_x = x + tip_length * math.cos(heading_rad)
         tip_y = y + tip_length * math.sin(heading_rad)
         pygame.draw.line(screen, (255, 0, 0), (x, y), (tip_x, tip_y), 3)
+
+    def draw_job_path(self, screen, job_path):
+        """Draw the job path as a blue line."""
+        if job_path and len(job_path) > 1:
+            job_path_screen = [self.map_to_screen(
+                x, y) for x, y, *_ in job_path]
+            pygame.draw.lines(screen, (0, 0, 200), False, job_path_screen, 2)
+
+    def draw_walked_path(self, screen, walked_path, blade_diameter):
+        """Draw the walked path and blade area as a green line and shaded area."""
+        if len(walked_path) > 1:
+            walked_path_screen = [self.map_to_screen(
+                x, y) for x, y in walked_path]
+            blade_radius = int(blade_diameter * self.scale // 2)
+            for pos in walked_path_screen:
+                pygame.draw.circle(screen, (180, 255, 180),
+                                   (int(pos[0]), int(pos[1])), blade_radius)
+            pygame.draw.lines(screen, (0, 150, 0), False,
+                              walked_path_screen, 2)
