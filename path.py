@@ -1,7 +1,14 @@
 import math
+import numpy as np
 
 
-def get_job_path(rect, blade_ef_diam, overlap, turn_radius):
+def arc_points(xc, yc, r, start_angle, end_angle, n=10):
+    """Generate n points along a circular arc"""
+    angles = np.linspace(start_angle, end_angle, n)
+    return [(xc + r*math.cos(a), yc + r*math.sin(a), a) for a in angles]
+
+
+def get_job_path(rect, blade_ef_diam, overlap, turn_radius, arc_res=10):
     x_min, y_min, x_max, y_max = rect
     lane_spacing = blade_ef_diam * (1 - overlap)
 
@@ -10,38 +17,50 @@ def get_job_path(rect, blade_ef_diam, overlap, turn_radius):
     direction = 1  # 1 = east, -1 = west
 
     while y <= y_max:
-        # straight segment
+        # Straight row
         if direction == 1:
-            path.append((x_min, y, 0))  # start pose
-            path.append((x_max, y, 0))  # end pose
+            path.append((x_min, y, 0))
+            path.append((x_max, y, 0))
+            x_end = x_max
         else:
-            path.append((x_max, y, math.pi))  # start west
-            path.append((x_min, y, math.pi))  # end west
+            path.append((x_max, y, math.pi))
+            path.append((x_min, y, math.pi))
+            x_end = x_min
 
-        # prepare next lane
-        y += lane_spacing
-        if y > y_max:
+        # Next row
+        y_next = y + lane_spacing
+        if y_next > y_max:
             break
 
-        # add a U-turn arc (simplified: just connect waypoints)
+        # U-turn arc
         if direction == 1:
-            path.append((x_max, y, math.pi))  # turned back
-        else:
-            path.append((x_min, y, 0))
+            # Turning from east-going to west-going
+            # Center of arc is to the right of the path
+            arc = arc_points(
+                x_end, y + turn_radius,
+                turn_radius,
+                -math.pi/2, math.pi/2,
+                arc_res
+            )
+            # Shift arc to end at the new lane
+            arc = [(x, y_next, theta+math.pi) if abs(y_next-y - lane_spacing) < 1e-6 else (x, y_arc, theta)
+                   for (x, y_arc, theta) in arc]
+            path.extend(arc)
 
-        # flip direction
+        else:
+            # Turning from west-going to east-going
+            arc = arc_points(
+                x_end, y + turn_radius,
+                turn_radius,
+                math.pi/2, 3*math.pi/2,
+                arc_res
+            )
+            arc = [(x, y_next, theta) if abs(y_next-y - lane_spacing) < 1e-6 else (x, y_arc, theta)
+                   for (x, y_arc, theta) in arc]
+            path.extend(arc)
+
+        # Move to next lane
+        y = y_next
         direction *= -1
 
     return path
-
-
-# Example usage
-rect = (0, 0, 10, 5)  # 10m wide, 5m tall area
-blade_ef_diam = 1.0   # 1 meter wide blade
-overlap = 0.2         # 20% overlap
-turn_radius = 0.5     # 0.5 m turning radius (not used yet)
-
-path = get_job_path(rect, blade_ef_diam, overlap, turn_radius)
-
-for pose in path:
-    print(pose)
