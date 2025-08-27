@@ -7,10 +7,10 @@ class CartDrawer:
         self.window_size = window_size
         self.world_rect = None
         self.cart_image = None
-        self.cart_size = 40  # Default size
+        self.cart_size = 1  # Default size
         self.blade_pos = (0, 0)
-        self.blade_diameter = 20  # Default diameter in cm
-        self.scale = 1.0
+        self.blade_diameter = 1  # Default diameter in cm
+        self.scale = 1
         self.offset = (0, 0)
 
     def set_world_space(self, rect):
@@ -88,7 +88,8 @@ class CartDrawer:
             blade_y)), int(self.blade_diameter * self.scale // 2))
 
         # --- Draw wheels ---
-        wheel_w, wheel_h = 18 * self.scale, 8 * self.scale  # long axis along heading
+        wheel_w, wheel_h = self.cart_size * self.scale / \
+            3, self.cart_size * self.scale / 8  # long axis along heading
         # Place wheels at front/rear edges along heading
         wheel_offset = self.cart_size * self.scale / 2 - wheel_h / 2
         lateral_offset = self.cart_size * self.scale / 2 - wheel_w / 2

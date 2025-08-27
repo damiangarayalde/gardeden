@@ -1,0 +1,3 @@
+dubins @ git+https://github.com/rdesc/pydubins.git@58c4b68d9ddf972dfd32afea295c3195da648cf2
+numpy==2.3.2
+pygame==2.6.1

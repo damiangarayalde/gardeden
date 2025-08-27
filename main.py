@@ -8,10 +8,11 @@ WIDTH, HEIGHT = 800, 600
 FPS = 60
 
 # World and cart setup
-WORLD_RECT = [0, 0, 400, 300]  # Example world rectangle (local coordinates)
-CART_RECT = [0, 0, 40, 40]     # Example cart bounding box (local coordinates)
+WORLD_RECT = [0, 0, 9, 4]  # Example world rectangle (local coordinates)
+# Example cart bounding box (local coordinates)
+CART_RECT = [0, 0, 0.5, 0.4]
 BLADE_POS = (0, 0)             # Blade at cart center
-BLADE_DIAMETER = 20            # Blade diameter in cm
+BLADE_DIAMETER = 0.3            # Blade diameter in meters
 
 # Initialize pygame
 pygame.init()
@@ -20,7 +21,7 @@ pygame.display.set_caption("Cart Simulation")
 clock = pygame.time.Clock()
 
 # Initialize simulation objects
-cart = Thing(wheel_base=40)
+cart = Thing(wheel_base=0.4)
 cart.set_world_space(WORLD_RECT)
 cart.set_initial_pose(0, 0, 0)  # Start near center, facing up
 
@@ -30,14 +31,14 @@ drawer.set_cart_size(CART_RECT, BLADE_POS, BLADE_DIAMETER)
 
 # Get job path (list of (x, y, angle) tuples in world coordinates)
 job_path = get_job_path(
-    WORLD_RECT, blade_ef_diam=BLADE_DIAMETER, overlap=0.2, turn_radius=0.5)
+    WORLD_RECT, blade_ef_diam=BLADE_DIAMETER, overlap=0.2, turn_radius=0.2)
 
 # Store walked path in real world coordinates
 walked_path = []
 
 # Control sensitivity
 ANGLE_STEP = 2      # degrees per key press
-SPEED_STEP = 0.2    # units per key press
+SPEED_STEP = 0.002    # units per key press
 
 running = True
 while running:
