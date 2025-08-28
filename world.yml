@@ -1,0 +1,5 @@
+world:
+  rect: [0, 0, 9, 4]
+  width: 800
+  height: 600
+  fps: 60

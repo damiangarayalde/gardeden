@@ -13,9 +13,9 @@ screen = pygame.display.set_mode((800, 600))  # (WIDTH, HEIGHT))
 pygame.display.set_caption("Cart Simulation")
 clock = pygame.time.Clock()
 
-cart = Thing("initial_config.yml")
+cart = Thing("cart.yml")
 
-drawer = Drawer("initial_config.yml")
+drawer = Drawer("graphics.yml", cart)
 
 job_path = get_job_path(cart)
 

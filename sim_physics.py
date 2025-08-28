@@ -32,14 +32,13 @@ class Thing:
         with open(initial_config, "r") as f:
             config = yaml.safe_load(f)
 
-        CART_RECT = config["cart"]["rect"]
-        # BLADE_POS = tuple(config["cart"]["blade_pos"])
-
+        self.rect = config["cart"]["rect"]
         self.world_rect = config["world"]["rect"]
         self.set_initial_pose(pose=config["cart"]["initial_pose"])
         self.speed = 0.0
         self.wheel_angle = 0.0
         self.wheel_base = config["cart"]["wheel_base"]
+        self.blade_pos = tuple(config["cart"]["blade_pos"])
         self.blade_diameter = config["cart"]["blade_diameter"]
         self.walked_path = []
         self.user_controller = UserController(

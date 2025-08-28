@@ -4,24 +4,27 @@ import yaml
 
 
 class Drawer:
-    def __init__(self, initial_config):
+    def __init__(self, initial_config, cart):
 
         # Load config from YAML
         with open(initial_config, "r") as f:
             config = yaml.safe_load(f)
 
-        self.window_size = (config["world"]["width"],
-                            config["world"]["height"])
+        self.window_size = (config["graphics"]["width"],
+                            config["graphics"]["height"])
         self.cart_size = 1  # Default size
         self.scale = 1
         self.offset = (0, 0)
         self.cart_image = None
 
-        self.set_world_space(config["world"]["rect"])
+        self.set_world_space(cart.world_rect)
 
-        self.set_cart_size(rect=config["cart"]["rect"],
-                           blade_pos=config["cart"]["blade_pos"],
-                           blade_diameter=config["cart"]["blade_diameter"])
+        self.set_cart_size(rect=cart.rect,
+                           blade_pos=cart.blade_pos,
+                           blade_diameter=cart.blade_diameter)
+        # self.set_cart_size(rect=config["cart"]["rect"],
+        #                    blade_pos=config["cart"]["blade_pos"],
+        #                    blade_diameter=config["cart"]["blade_diameter"])
 
     def set_world_space(self, rect):
         """Map rect to 80% of window, keep aspect ratio."""
