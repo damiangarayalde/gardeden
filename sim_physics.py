@@ -36,7 +36,7 @@ class Thing:
         self.walked_path = []
         self.user_controller = UserController(angle_step, speed_step)
         self.closed_loop_controller = ClosedLoopController(
-            lookahead=0.5, wheelbase=self.wheel_base)
+            self, lookahead=0.5, wheelbase=self.wheel_base)
 
     def set_world_space(self, rect):
         self.world_rect = rect
