@@ -32,6 +32,19 @@ job_path = get_job_path(
 ANGLE_STEP = 20
 SPEED_STEP = 0.002
 
+
+def handle_cart_controls(keys, cart, angle_step, speed_step):
+    """Update cart state based on keyboard input."""
+    if keys[pygame.K_a]:
+        cart.angle -= angle_step
+    if keys[pygame.K_d]:
+        cart.angle += angle_step
+    if keys[pygame.K_w]:
+        cart.speed += speed_step
+    if keys[pygame.K_s]:
+        cart.speed -= speed_step
+
+
 running = True
 while running:
     clock.tick(FPS)
@@ -39,25 +52,18 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-    keys = pygame.key.get_pressed()
     pose = cart.get_pose()
     path_xy = [(x, y) for x, y, _ in job_path]
     wheel_angle_rad = pure_pursuit_control(
         pose[0], pose[1], math.radians(pose[2]), path_xy, lookahead=0.05, wheelbase=cart.wheel_base)
     cart.wheel_angle = max(-45, min(45, math.degrees(wheel_angle_rad)))
 
-    if keys[pygame.K_a]:
-        cart.angle -= ANGLE_STEP
-    if keys[pygame.K_d]:
-        cart.angle += ANGLE_STEP
-    if keys[pygame.K_w]:
-        cart.speed += SPEED_STEP
-    if keys[pygame.K_s]:
-        cart.speed -= SPEED_STEP
+    keys = pygame.key.get_pressed()
+
+    handle_cart_controls(keys, cart, ANGLE_STEP, SPEED_STEP)
 
     cart.update_pose(dt=1.0)
 
-    screen.fill((240, 240, 240))
     drawer.draw_scene(
         screen,
         job_path,

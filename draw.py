@@ -147,6 +147,7 @@ class CartDrawer:
         Draws the entire simulation scene: job path, walked path, and cart.
         All cart details are retrieved from the cart instance.
         """
+        screen.fill((240, 240, 240))
         self.draw_job_path(screen, job_path)
         self.draw_walked_path(
             screen,
