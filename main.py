@@ -9,11 +9,9 @@ FPS = 30
 
 
 pygame.init()
-pygame.display.set_caption("Cart Simulation")
 clock = pygame.time.Clock()
 
 cart = Thing("cart.yml")
-
 drawer = Drawer("graphics.yml", cart)
 
 job_path = get_job_path(cart)
@@ -29,10 +27,11 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-    wheel_angle_rad = cart.closed_loop_controller.pure_pursuit()
-    cart.wheel_angle = max(-45, min(45, math.degrees(wheel_angle_rad)))
-
     cart.user_controller.update(pygame, cart)
+
+    wheel_angle_rad = cart.closed_loop_controller.pure_pursuit()
+
+    cart.wheel_angle = max(-45, min(45, math.degrees(wheel_angle_rad)))
 
     cart.update_pose(dt=1.0)
 
@@ -40,6 +39,5 @@ while running:
         job_path,
         cart
     )
-    pygame.display.flip()
 
 pygame.quit()

@@ -6,6 +6,8 @@ import yaml
 class Drawer:
     def __init__(self, initial_config, cart):
 
+        pygame.display.set_caption("Cart Simulation")
+
         # Load config from YAML
         with open(initial_config, "r") as f:
             config = yaml.safe_load(f)
@@ -174,3 +176,4 @@ class Drawer:
             cart.get_pose(),
             cart.get_wheel_angle()
         )
+        pygame.display.flip()
