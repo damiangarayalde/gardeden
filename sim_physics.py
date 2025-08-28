@@ -1,28 +1,31 @@
 import math
 
 
-# def update_cart_position(x, y, heading, wheel_angle, speed, wheel_base):
-#     """
-#     Update cart position and heading using a simple bicycle model.
-#     Returns new_x, new_y, new_heading.
-#     """
-#     # Update heading
-#     if speed != 0:
-#         turning_radius = wheel_base / \
-#             math.tan(math.radians(wheel_angle)
-#                      ) if wheel_angle != 0 else float('inf')
-#         angular_velocity = speed / \
-#             turning_radius if turning_radius != float('inf') else 0
-#         heading += math.degrees(angular_velocity)
-#     # Update position
-#     angle_rad = math.radians(heading)
-#     dx = speed * math.cos(angle_rad)
-#     dy = speed * math.sin(angle_rad)
-#     return x + dx, y + dy, heading
+class UserController:
+    def __init__(self, angle_step=20, speed_step=0.002):
+        self.angle_step = angle_step
+        self.speed_step = speed_step
+
+    def set_params(self, angle_step, speed_step):
+        self.angle_step = angle_step
+        self.speed_step = speed_step
+
+    def update(self, pygame, cart):
+
+        keys = pygame.key.get_pressed()
+
+        if keys[pygame.K_a]:
+            cart.angle -= self.angle_step
+        if keys[pygame.K_d]:
+            cart.angle += self.angle_step
+        if keys[pygame.K_w]:
+            cart.speed += self.speed_step
+        if keys[pygame.K_s]:
+            cart.speed -= self.speed_step
 
 
 class Thing:
-    def __init__(self, wheel_base=40, blade_diameter=1):
+    def __init__(self, wheel_base=40, blade_diameter=1, angle_step=20, speed_step=0.002):
         self.world_rect = None
         self.x = 0.0
         self.y = 0.0
@@ -32,6 +35,7 @@ class Thing:
         self.wheel_base = wheel_base
         self.blade_diameter = blade_diameter
         self.walked_path = []
+        self.user_controller = UserController(angle_step, speed_step)
 
     def set_world_space(self, rect):
         self.world_rect = rect

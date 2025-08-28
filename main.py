@@ -5,7 +5,6 @@ from draw import CartDrawer
 from path import get_job_path
 from controller import pure_pursuit_control
 
-# --- Configurations ---
 WIDTH, HEIGHT = 800, 600
 FPS = 60
 WORLD_RECT = [0, 0, 9, 4]
@@ -18,7 +17,8 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Cart Simulation")
 clock = pygame.time.Clock()
 
-cart = Thing(wheel_base=0.4, blade_diameter=BLADE_DIAMETER)
+cart = Thing(wheel_base=0.4, blade_diameter=BLADE_DIAMETER,
+             angle_step=20, speed_step=0.002)
 cart.set_world_space(WORLD_RECT)
 cart.set_initial_pose(0, 0, 0)
 
@@ -28,22 +28,6 @@ drawer.set_cart_size(CART_RECT, BLADE_POS, BLADE_DIAMETER)
 
 job_path = get_job_path(
     WORLD_RECT, blade_ef_diam=BLADE_DIAMETER, overlap=0.2, turn_radius=0.2)
-
-ANGLE_STEP = 20
-SPEED_STEP = 0.002
-
-
-def handle_cart_controls(keys, cart, angle_step, speed_step):
-    """Update cart state based on keyboard input."""
-    if keys[pygame.K_a]:
-        cart.angle -= angle_step
-    if keys[pygame.K_d]:
-        cart.angle += angle_step
-    if keys[pygame.K_w]:
-        cart.speed += speed_step
-    if keys[pygame.K_s]:
-        cart.speed -= speed_step
-
 
 running = True
 while running:
@@ -58,9 +42,7 @@ while running:
         pose[0], pose[1], math.radians(pose[2]), path_xy, lookahead=0.05, wheelbase=cart.wheel_base)
     cart.wheel_angle = max(-45, min(45, math.degrees(wheel_angle_rad)))
 
-    keys = pygame.key.get_pressed()
-
-    handle_cart_controls(keys, cart, ANGLE_STEP, SPEED_STEP)
+    cart.user_controller.update(pygame, cart)
 
     cart.update_pose(dt=1.0)
 
