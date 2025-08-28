@@ -141,3 +141,11 @@ class CartDrawer:
                                    (int(pos[0]), int(pos[1])), blade_radius)
             pygame.draw.lines(screen, (0, 150, 0), False,
                               walked_path_screen, 2)
+
+    def draw_scene(self, screen, job_path, walked_path, blade_diameter, cart_pose, wheel_angle):
+        """
+        Draws the entire simulation scene: job path, walked path, and cart.
+        """
+        self.draw_job_path(screen, job_path)
+        self.draw_walked_path(screen, walked_path, blade_diameter)
+        self.draw_cart(screen, cart_pose, wheel_angle)
