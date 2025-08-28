@@ -12,3 +12,5 @@ cart:
   angle_step: 20
   speed_step: 0.002
   initial_pose: [0, 0, 0]
+  turn_radius: 0.2
+  overlap: 0.2

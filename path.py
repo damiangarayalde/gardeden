@@ -24,19 +24,17 @@ def dubins_segment(q0, q1, turn_radius, step=0.05):
     return [(x, y, angle_wrap(yaw)) for (x, y, yaw) in configs]
 
 
-def get_job_path(rect, blade_ef_diam, overlap, turn_radius,
-                 start_pose=None, row_heading=0.0, sample_step=0.05):
+def get_job_path(cart, start_pose=None, row_heading=0.0, sample_step=0.05):
     """
-    rect: (x_min, y_min, x_max, y_max)
-    blade_ef_diam: coverage width (m)
-    overlap: fraction [0..1]
-    turn_radius: min turning radius (m)
-    start_pose: optional (x,y,theta). If None, start at (x_min, y_min, row_heading).
-    row_heading: heading for the first lane (0 means +X / east)
-    sample_step: sampling step for Dubins paths (m)
-
+    cart: Thing instance
+    start_pose, row_heading, sample_step: as before
     Returns: list[(x,y,theta)] full path
     """
+    rect = cart.world_rect
+    blade_ef_diam = cart.blade_diameter
+    overlap = cart.overlap
+    turn_radius = cart.turn_radius
+
     x_min, y_min, x_max, y_max = rect
     spacing = lane_spacing_from(blade_ef_diam, overlap)
 

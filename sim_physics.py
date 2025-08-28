@@ -1,4 +1,5 @@
 import math
+import yaml
 from controller import ClosedLoopController
 
 
@@ -24,27 +25,37 @@ class UserController:
 
 
 class Thing:
-    def __init__(self, wheel_base=40, blade_diameter=1, angle_step=20, speed_step=0.002):
-        self.world_rect = None
-        self.x = 0.0
-        self.y = 0.0
-        self.angle = 0.0  # degrees
+
+    def __init__(self, initial_config="config.yml"):
+
+        # Load config from YAML
+        with open(initial_config, "r") as f:
+            config = yaml.safe_load(f)
+
+        CART_RECT = config["cart"]["rect"]
+        # BLADE_POS = tuple(config["cart"]["blade_pos"])
+
+        self.world_rect = config["world"]["rect"]
+        self.set_initial_pose(pose=config["cart"]["initial_pose"])
         self.speed = 0.0
         self.wheel_angle = 0.0
-        self.wheel_base = wheel_base
-        self.blade_diameter = blade_diameter
+        self.wheel_base = config["cart"]["wheel_base"]
+        self.blade_diameter = config["cart"]["blade_diameter"]
         self.walked_path = []
-        self.user_controller = UserController(angle_step, speed_step)
+        self.user_controller = UserController(
+            config["cart"]["angle_step"], config["cart"]["speed_step"])
         self.closed_loop_controller = ClosedLoopController(
             self, lookahead=0.5, wheelbase=self.wheel_base)
+        self.turn_radius = config["cart"].get("turn_radius", 0.2)
+        self.overlap = config["cart"].get("overlap", 0.2)
 
     def set_world_space(self, rect):
         self.world_rect = rect
 
-    def set_initial_pose(self, x, y, angle):
-        self.x = x
-        self.y = y
-        self.angle = angle
+    def set_initial_pose(self, pose):
+        self.x = pose[0]
+        self.y = pose[1]
+        self.angle = pose[2]
 
     def update_pose(self, dt=1.0):
         if self.speed != 0:

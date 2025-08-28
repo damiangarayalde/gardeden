@@ -1,17 +1,27 @@
 import pygame
 import math
+import yaml
 
 
-class CartDrawer:
-    def __init__(self, window_size):
-        self.window_size = window_size
-        self.world_rect = None
-        self.cart_image = None
+class Drawer:
+    def __init__(self, initial_config):
+
+        # Load config from YAML
+        with open(initial_config, "r") as f:
+            config = yaml.safe_load(f)
+
+        self.window_size = (config["world"]["width"],
+                            config["world"]["height"])
         self.cart_size = 1  # Default size
-        self.blade_pos = (0, 0)
-        self.blade_diameter = 1  # Default diameter in cm
         self.scale = 1
         self.offset = (0, 0)
+        self.cart_image = None
+
+        self.set_world_space(config["world"]["rect"])
+
+        self.set_cart_size(rect=config["cart"]["rect"],
+                           blade_pos=config["cart"]["blade_pos"],
+                           blade_diameter=config["cart"]["blade_diameter"])
 
     def set_world_space(self, rect):
         """Map rect to 80% of window, keep aspect ratio."""
