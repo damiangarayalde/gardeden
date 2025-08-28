@@ -16,6 +16,8 @@ class Drawer:
         self.scale = 1
         self.offset = (0, 0)
         self.cart_image = None
+        self.screen = pygame.display.set_mode(
+            self.window_size)  # (WIDTH, HEIGHT))
 
         self.set_world_space(cart.world_rect)
 
@@ -71,13 +73,14 @@ class Drawer:
         sy = y * self.scale + self.offset[1]
         return sx, sy
 
-    def draw_cart(self, screen, cart_pose, wheel_angle):
+    def draw_cart(self, cart_pose, wheel_angle):
         """
         Draws a cart at (x, y, heading) with given wheel angle.
         The cart is a square with a central circle and 4 wheels (rectangles).
         Front wheels rotate to indicate steering.
         """
         x, y, heading = cart_pose
+
         # Map cart position to screen
         x, y = self.map_to_screen(x, y)
         heading_rad = math.radians(heading)
@@ -90,14 +93,14 @@ class Drawer:
             bx = x + dx * math.cos(heading_rad) - dy * math.sin(heading_rad)
             by = y + dx * math.sin(heading_rad) + dy * math.cos(heading_rad)
             body_corners.append((bx, by))
-        pygame.draw.polygon(screen, (0, 100, 200), body_corners)
+        pygame.draw.polygon(self.screen, (0, 100, 200), body_corners)
 
         # --- Draw central circle (blade) ---
         blade_x = x + self.blade_pos[0] * self.scale * math.cos(
             heading_rad) - self.blade_pos[1] * self.scale * math.sin(heading_rad)
         blade_y = y + self.blade_pos[0] * self.scale * math.sin(
             heading_rad) + self.blade_pos[1] * self.scale * math.cos(heading_rad)
-        pygame.draw.circle(screen, (200, 200, 0), (int(blade_x), int(
+        pygame.draw.circle(self.screen, (200, 200, 0), (int(blade_x), int(
             blade_y)), int(self.blade_diameter * self.scale // 2))
 
         # --- Draw wheels ---
@@ -128,47 +131,46 @@ class Drawer:
                     wdy * math.cos(wheel_angle_rad)
                 wheel_corners.append((cx, cy))
             color = (50, 50, 50) if i < 2 else (120, 120, 120)
-            pygame.draw.polygon(screen, color, wheel_corners)
+            pygame.draw.polygon(self.screen, color, wheel_corners)
 
         # --- Draw heading indicator (small line from center) ---
         tip_length = cart_size // 2
         tip_x = x + tip_length * math.cos(heading_rad)
         tip_y = y + tip_length * math.sin(heading_rad)
-        pygame.draw.line(screen, (255, 0, 0), (x, y), (tip_x, tip_y), 3)
+        pygame.draw.line(self.screen, (255, 0, 0), (x, y), (tip_x, tip_y), 3)
 
-    def draw_job_path(self, screen, job_path):
+    def draw_job_path(self, job_path):
         """Draw the job path as a blue line."""
         if job_path and len(job_path) > 1:
             job_path_screen = [self.map_to_screen(
                 x, y) for x, y, *_ in job_path]
-            pygame.draw.lines(screen, (0, 0, 200), False, job_path_screen, 2)
+            pygame.draw.lines(self.screen, (0, 0, 200),
+                              False, job_path_screen, 2)
 
-    def draw_walked_path(self, screen, walked_path, blade_diameter):
+    def draw_walked_path(self, walked_path, blade_diameter):
         """Draw the walked path and blade area as a green line and shaded area."""
         if len(walked_path) > 1:
             walked_path_screen = [self.map_to_screen(
                 x, y) for x, y in walked_path]
             blade_radius = int(blade_diameter * self.scale // 2)
             for pos in walked_path_screen:
-                pygame.draw.circle(screen, (180, 255, 180),
+                pygame.draw.circle(self.screen, (180, 255, 180),
                                    (int(pos[0]), int(pos[1])), blade_radius)
-            pygame.draw.lines(screen, (0, 150, 0), False,
+            pygame.draw.lines(self.screen, (0, 150, 0), False,
                               walked_path_screen, 2)
 
-    def draw_scene(self, screen, job_path, cart):
+    def draw_scene(self, job_path, cart):
         """
         Draws the entire simulation scene: job path, walked path, and cart.
         All cart details are retrieved from the cart instance.
         """
-        screen.fill((240, 240, 240))
-        self.draw_job_path(screen, job_path)
+        self.screen.fill((240, 240, 240))
+        self.draw_job_path(job_path)
         self.draw_walked_path(
-            screen,
             cart.get_walked_path(),
             blade_diameter=cart.get_blade_diameter()
         )
         self.draw_cart(
-            screen,
             cart.get_pose(),
             cart.get_wheel_angle()
         )
