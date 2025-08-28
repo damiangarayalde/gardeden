@@ -3,7 +3,6 @@ import math
 from sim_physics import Thing
 from draw import CartDrawer
 from path import get_job_path
-from controller import pure_pursuit_control
 
 WIDTH, HEIGHT = 800, 600
 FPS = 60
@@ -38,12 +37,10 @@ while running:
 
     pose = cart.get_pose()
     path_xy = [(x, y) for x, y, _ in job_path]
-    wheel_angle_rad = pure_pursuit_control(
-        pose[0], pose[1], math.radians(pose[2]), path_xy, lookahead=0.05, wheelbase=cart.wheel_base)
+    wheel_angle_rad = cart.closed_loop_controller.pure_pursuit(pose, path_xy)
     cart.wheel_angle = max(-45, min(45, math.degrees(wheel_angle_rad)))
 
     cart.user_controller.update(pygame, cart)
-
     cart.update_pose(dt=1.0)
 
     drawer.draw_scene(

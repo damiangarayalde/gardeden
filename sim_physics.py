@@ -1,4 +1,5 @@
 import math
+from controller import ClosedLoopController
 
 
 class UserController:
@@ -11,9 +12,7 @@ class UserController:
         self.speed_step = speed_step
 
     def update(self, pygame, cart):
-
         keys = pygame.key.get_pressed()
-
         if keys[pygame.K_a]:
             cart.angle -= self.angle_step
         if keys[pygame.K_d]:
@@ -36,6 +35,8 @@ class Thing:
         self.blade_diameter = blade_diameter
         self.walked_path = []
         self.user_controller = UserController(angle_step, speed_step)
+        self.closed_loop_controller = ClosedLoopController(
+            lookahead=0.5, wheelbase=self.wheel_base)
 
     def set_world_space(self, rect):
         self.world_rect = rect
@@ -58,7 +59,6 @@ class Thing:
         dy = self.speed * math.sin(angle_rad) * dt
         self.x += dx
         self.y += dy
-        # Store walked path
         self.walked_path.append((self.x, self.y))
         return self.x, self.y, self.angle
 
