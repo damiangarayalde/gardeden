@@ -35,8 +35,7 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-    path_xy = [(x, y) for x, y, _ in job_path]
-    wheel_angle_rad = cart.closed_loop_controller.pure_pursuit(path_xy)
+    wheel_angle_rad = cart.closed_loop_controller.pure_pursuit(job_path)
     cart.wheel_angle = max(-45, min(45, math.degrees(wheel_angle_rad)))
 
     cart.user_controller.update(pygame, cart)
