@@ -22,17 +22,18 @@ import math
 
 
 class Thing:
-    def __init__(self, wheel_base=40):
-        self.world_rect = None  # [(x0, y0), (x1, y1), (x2, y2), (x3, y3)]
+    def __init__(self, wheel_base=40, blade_diameter=1):
+        self.world_rect = None
         self.x = 0.0
         self.y = 0.0
         self.angle = 0.0  # degrees
         self.speed = 0.0
         self.wheel_angle = 0.0
         self.wheel_base = wheel_base
+        self.blade_diameter = blade_diameter
+        self.walked_path = []
 
     def set_world_space(self, rect):
-        """rect: list of 4 vertices [(x0, y0), ..., (x3, y3)]"""
         self.world_rect = rect
 
     def set_initial_pose(self, x, y, angle):
@@ -41,7 +42,6 @@ class Thing:
         self.angle = angle
 
     def update_pose(self, dt=1.0):
-        """Update pose using bicycle model. dt is time step."""
         if self.speed != 0:
             turning_radius = self.wheel_base / \
                 math.tan(math.radians(self.wheel_angle)
@@ -54,7 +54,18 @@ class Thing:
         dy = self.speed * math.sin(angle_rad) * dt
         self.x += dx
         self.y += dy
+        # Store walked path
+        self.walked_path.append((self.x, self.y))
         return self.x, self.y, self.angle
 
     def get_pose(self):
         return self.x, self.y, self.angle
+
+    def get_walked_path(self):
+        return self.walked_path
+
+    def get_blade_diameter(self):
+        return self.blade_diameter
+
+    def get_wheel_angle(self):
+        return self.wheel_angle

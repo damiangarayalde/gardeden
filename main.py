@@ -18,7 +18,7 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Cart Simulation")
 clock = pygame.time.Clock()
 
-cart = Thing(wheel_base=0.4)
+cart = Thing(wheel_base=0.4, blade_diameter=BLADE_DIAMETER)
 cart.set_world_space(WORLD_RECT)
 cart.set_initial_pose(0, 0, 0)
 
@@ -28,7 +28,6 @@ drawer.set_cart_size(CART_RECT, BLADE_POS, BLADE_DIAMETER)
 
 job_path = get_job_path(
     WORLD_RECT, blade_ef_diam=BLADE_DIAMETER, overlap=0.2, turn_radius=0.2)
-walked_path = []
 
 ANGLE_STEP = 20
 SPEED_STEP = 0.002
@@ -57,16 +56,12 @@ while running:
         cart.speed -= SPEED_STEP
 
     cart.update_pose(dt=1.0)
-    walked_path.append(cart.get_pose()[:2])
 
     screen.fill((240, 240, 240))
     drawer.draw_scene(
         screen,
         job_path,
-        walked_path,
-        blade_diameter=BLADE_DIAMETER,
-        cart_pose=cart.get_pose(),
-        wheel_angle=cart.wheel_angle
+        cart
     )
     pygame.display.flip()
 
