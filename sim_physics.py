@@ -58,7 +58,7 @@ class Thing:
         self.y = pose[1]
         self.angle = pose[2]
 
-    def update_pose(self, dt=1.0):
+    def update_pose(self, dt):
         if self.speed != 0:
             turning_radius = self.wheel_base / \
                 math.tan(self.wheel_angle
@@ -88,3 +88,10 @@ class Thing:
 
     def set_job_path(self, job_path):
         self.job_path = job_path
+
+    def run_controller_step(self):
+
+        self.wheel_angle = self.closed_loop_controller.pure_pursuit()
+        # = wheel_angle_rad#max(-45,
+        #   min(45, math.degrees(wheel_angle_rad)))
+        self.update_pose(dt=1.0)

@@ -31,8 +31,6 @@ while running:
 
     cart.run_controller_step()
 
-    cart.update_pose(dt=1.0)
-
     drawer.draw_scene(
         job_path,
         cart
