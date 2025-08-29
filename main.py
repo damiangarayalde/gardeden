@@ -29,9 +29,7 @@ while running:
 
     cart.user_controller.update(pygame, cart)
 
-    wheel_angle_rad = cart.closed_loop_controller.pure_pursuit()
-
-    cart.wheel_angle = max(-45, min(45, math.degrees(wheel_angle_rad)))
+    cart.run_controller_step()
 
     cart.update_pose(dt=1.0)
 

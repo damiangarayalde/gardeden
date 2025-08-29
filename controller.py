@@ -7,20 +7,17 @@ class ClosedLoopController:
         self.lookahead = lookahead
         self.wheelbase = wheelbase
 
-    def set_params(self, lookahead=0.5, wheelbase=0.5):
-        self.lookahead = lookahead
-        self.wheelbase = wheelbase
+    def pure_pursuit(self):
+        """
+        Uses self.cart.job_path for path following.
+        """
+        job_path = self.cart.job_path
+        if not job_path:
+            return 0.0  # No path, no steering
 
-    def pure_pursuit(self, job_path):
-        """
-        job_path: list of (x, y, angle) waypoints
-        returns: steering angle (rad)
-        """
         x, y, theta_deg = self.cart.get_pose()
         theta = math.radians(theta_deg)
-        # Extract only (x, y) for waypoints
         path_xy = [(px, py) for px, py, _ in job_path]
-        # Find closest waypoint ahead at lookahead distance
         for px, py in path_xy:
             dist = math.hypot(px - x, py - y)
             if dist >= self.lookahead:
