@@ -73,7 +73,7 @@ class Drawer:
         sy = y * self.scale + self.offset[1]
         return sx, sy
 
-    def draw_cart(self, cart_pose, wheel_angle):
+    def draw_cart(self, cart_pose):
         """
         Draws a cart at (x, y, heading) with given wheel angle.
         The cart is a square with a central circle and 4 wheels (rectangles).
@@ -103,35 +103,35 @@ class Drawer:
         pygame.draw.circle(self.screen, (200, 200, 0), (int(blade_x), int(
             blade_y)), int(self.blade_diameter * self.scale // 2))
 
-        # --- Draw wheels ---
-        wheel_w, wheel_h = self.cart_size * self.scale / \
-            3, self.cart_size * self.scale / 8  # long axis along heading
-        # Place wheels at front/rear edges along heading
-        wheel_offset = self.cart_size * self.scale / 2 - wheel_h / 2
-        lateral_offset = self.cart_size * self.scale / 2 - wheel_w / 2
+        # # --- Draw wheels ---
+        # wheel_w, wheel_h = self.cart_size * self.scale / \
+        #     3, self.cart_size * self.scale / 8  # long axis along heading
+        # # Place wheels at front/rear edges along heading
+        # wheel_offset = self.cart_size * self.scale / 2 - wheel_h / 2
+        # lateral_offset = self.cart_size * self.scale / 2 - wheel_w / 2
 
-        wheel_positions = [
-            (-lateral_offset, -wheel_offset),
-            (-lateral_offset, wheel_offset),
-            (lateral_offset, -wheel_offset),
-            (lateral_offset, wheel_offset),
-        ]
-        for i, (dx, dy) in enumerate(wheel_positions):
-            wheel_angle_rad = heading_rad
-            if i >= 2:
-                wheel_angle_rad += math.radians(wheel_angle)
-            wx = x + dx * math.cos(heading_rad) - dy * math.sin(heading_rad)
-            wy = y + dx * math.sin(heading_rad) + dy * math.cos(heading_rad)
-            wheel_corners = []
-            for wdx, wdy in [(-wheel_w/2, -wheel_h/2), (wheel_w/2, -wheel_h/2),
-                             (wheel_w/2, wheel_h/2), (-wheel_w/2, wheel_h/2)]:
-                cx = wx + wdx * math.cos(wheel_angle_rad) - \
-                    wdy * math.sin(wheel_angle_rad)
-                cy = wy + wdx * math.sin(wheel_angle_rad) + \
-                    wdy * math.cos(wheel_angle_rad)
-                wheel_corners.append((cx, cy))
-            color = (50, 50, 50) if i < 2 else (120, 120, 120)
-            pygame.draw.polygon(self.screen, color, wheel_corners)
+        # wheel_positions = [
+        #     (-lateral_offset, -wheel_offset),
+        #     (-lateral_offset, wheel_offset),
+        #     (lateral_offset, -wheel_offset),
+        #     (lateral_offset, wheel_offset),
+        # ]
+        # for i, (dx, dy) in enumerate(wheel_positions):
+        #     wheel_angle_rad = heading_rad
+        #     if i >= 2:
+        #         wheel_angle_rad += math.radians(wheel_angle)
+        #     wx = x + dx * math.cos(heading_rad) - dy * math.sin(heading_rad)
+        #     wy = y + dx * math.sin(heading_rad) + dy * math.cos(heading_rad)
+        #     wheel_corners = []
+        #     for wdx, wdy in [(-wheel_w/2, -wheel_h/2), (wheel_w/2, -wheel_h/2),
+        #                      (wheel_w/2, wheel_h/2), (-wheel_w/2, wheel_h/2)]:
+        #         cx = wx + wdx * math.cos(wheel_angle_rad) - \
+        #             wdy * math.sin(wheel_angle_rad)
+        #         cy = wy + wdx * math.sin(wheel_angle_rad) + \
+        #             wdy * math.cos(wheel_angle_rad)
+        #         wheel_corners.append((cx, cy))
+        #     color = (50, 50, 50) if i < 2 else (120, 120, 120)
+        #     pygame.draw.polygon(self.screen, color, wheel_corners)
 
         # --- Draw heading indicator (small line from center) ---
         tip_length = cart_size // 2
@@ -202,7 +202,7 @@ class Drawer:
             blade_diameter=cart.get_blade_diameter()
         )
         self.draw_cart(
-            cart.get_pose(),
-            cart.get_wheel_angle()
+            cart.get_pose()  # ,
+            #  cart.get_wheel_angle()
         )
         pygame.display.flip()
