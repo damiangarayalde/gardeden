@@ -8,7 +8,7 @@ cart:
   blade_diameter: 0.3
   wheel_base: 0.4
   angle_step: 0.6
-  speed_step: 0.01
+  speed_step: 0.001
   initial_pose: [0, 0, 0]
   turn_radius: 0.2
   overlap: 0.1

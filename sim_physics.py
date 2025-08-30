@@ -10,30 +10,6 @@ def normalize_angle(angle_deg: float) -> float:
     return wrapped
 
 
-class UserUI:
-    def __init__(self, angle_step=0.2, speed_step=0.002):
-        self.angle_step = angle_step
-        self.speed_step = speed_step
-
-    def set_params(self, angle_step, speed_step):
-        self.angle_step = angle_step
-        self.speed_step = speed_step
-
-    def check_for_inputs(self, pygame, cart):
-        keys = pygame.key.get_pressed()
-
-        # this should be a dictionary or a config file with the controller bindings
-
-        if keys[pygame.K_a]:  # spin left
-            cart.y -= self.angle_step
-        if keys[pygame.K_d]:  # spin right
-            cart.y += self.angle_step
-        if keys[pygame.K_w]:
-            cart.speed += self.speed_step
-        if keys[pygame.K_s]:
-            cart.speed -= self.speed_step
-
-
 class Thing:
 
     def __init__(self, initial_config="config.yml"):
@@ -41,18 +17,20 @@ class Thing:
         with open(initial_config, "r") as f:
             config = yaml.safe_load(f)
 
+        self.paused = False
         self.rect = config["cart"]["rect"]
         self.world_rect = config["world"]["rect"]
+        self.walked_path = []
+
         self.set_pose(pose=config["cart"]["initial_pose"])
         self.speed = 0.0
-        self.wheel_angle = 0.0
+        self.target_speed = 0.0
         self.wheel_base = config["cart"]["wheel_base"]
         self.blade_pos = tuple(config["cart"]["blade_pos"])
         self.blade_diameter = config["cart"]["blade_diameter"]
-        self.walked_path = []
-        self.user_ui = UserUI(config["cart"]["speed_step"])
+        self.angle_step = config["cart"]["angle_step"]
+        self.speed_step = config["cart"]["speed_step"]
         self.job_path = None
-        # self.closed_loop_controller = ClosedLoopController(self)
         self.turn_radius = config["cart"].get("turn_radius", 0.2)
         self.overlap = config["cart"].get("overlap", 0.2)
         self.current_path_index = 0
@@ -63,24 +41,31 @@ class Thing:
     def set_world_space(self, rect):
         self.world_rect = rect
 
+    def toggle_pause(self):
+        self.paused = not self.paused
+        self.update_speed()
+
+    def update_speed(self):
+        self.speed = 0.0 if self.paused else self.target_speed
+
     def set_pose(self, pose):
         self.x = pose[0]
         self.y = pose[1]
         self.angle = pose[2]  # degrees
+        self.walked_path.append((self.x, self.y))
 
     def estimate_next_pose(self, dt):
         """Provides the next estimated pose based on current config."""
-        # self.speed = (self.v_r + self.v_l) / 2.0
-        self.wheel_angle = (self.v_r - self.v_l) / self.wheel_base
+
+        omega = (self.v_r - self.v_l) / self.wheel_base
 
         angle_rad = math.radians(self.angle)
-        self.x += self.speed * math.cos(angle_rad) * dt
-        self.y += self.speed * math.sin(angle_rad) * dt
-        self.angle = normalize_angle(
-            self.angle + math.degrees(self.wheel_angle * dt))
+        x = self.x + self.speed * math.cos(angle_rad) * dt
+        y = self.y + self.speed * math.sin(angle_rad) * dt
+        angle = normalize_angle(
+            self.angle + math.degrees(omega * dt))
 
-        self.walked_path.append((self.x, self.y))
-        return self.x, self.y, self.angle
+        return x, y, angle
 
     def get_pose(self):
         return self.x, self.y, self.angle
@@ -126,18 +111,47 @@ class Thing:
         # Simple wheel command logic
         k_turn = 0.99
 
-        if local_y > 0.001:   # carrot to left
+        if local_y > 0.01:   # carrot to left
             self.v_l = self.speed/2*(1 - k_turn)
             self.v_r = self.speed/2*(1 + k_turn)
-        elif local_y < -0.001:  # carrot to right
+        elif local_y < -0.01:  # carrot to right
             self.v_l = self.speed/2*(1 + k_turn)
             self.v_r = self.speed/2*(1 - k_turn)
+        else:  # go straight
+            self.v_l = self.speed/2
+            self.v_r = self.speed/2
 
         print(
-            f"pose | θ={theta_deg:.1f}° "
+            f"pose | θ={theta_deg:.1f}° | k_turn={k_turn:.1f}%"
             f"| carrot local=({local_x:.2f},\t speed: {self.speed:.2f}) "
             f"| v_l={self.v_l:.3f}, v_r={self.v_r:.3f}"
         )
 
-    def run_controller(self):
+    def run_inputs_bindings(self, inputs):
+
+        if inputs:
+            print(f"User input: {inputs}")
+
+           # for input in inputs:
+            if input == "left":
+                self.y -= self.angle_step
+            elif input == "right":
+                self.y += self.angle_step
+            elif input == "move_faster":
+                self.target_speed += self.speed_step
+            elif input == "move_slower":
+                self.target_speed -= self.speed_step
+            elif input == "toggle_pause":
+                self.toggle_pause()
+
+    def run_controller(self, user_inputs, measured_cart_pose=None):
+        # this allow us to have multiple control strategies
+
+        # update cart model pose based on observer data
+        self.set_pose(measured_cart_pose)
+        # update the cart config based on user inputs
+        self.run_inputs_bindings(user_inputs)
+        print(f"User input: {user_inputs}")
+
+        # run the path following controller
         self.pure_pursuit()
