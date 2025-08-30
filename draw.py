@@ -140,13 +140,33 @@ class Drawer:
         pygame.draw.line(self.screen, (255, 0, 0), (x, y), (tip_x, tip_y), 3)
 
     def draw_job_path(self, job_path):
-        """Draw the job path as a blue line."""
+        """Draw the job path as a blue line, with labels at start, mid, end."""
         if job_path and len(job_path) > 1:
             job_path_screen = [self.map_to_screen(
                 x, y) for x, y, *_ in job_path]
 
-            pygame.draw.lines(self.screen, (10, 10, 20),
+            # Draw the path
+            pygame.draw.lines(self.screen, (100, 100, 200),
                               False, job_path_screen, 2)
+
+            # Create font
+            font = pygame.font.SysFont("Arial", 14)
+
+            # --- Pick positions: start, mid, end ---
+            start_idx = 0
+            mid_idx = len(job_path) // 2
+            end_idx = len(job_path) - 1
+
+            for idx, label in zip([start_idx, mid_idx, end_idx], ["Start", "Mid", "End"]):
+                x, y, *_ = job_path[idx]
+                sx, sy = job_path_screen[idx]
+
+                # Render text with coordinates (3 decimals)
+                text = font.render(
+                    f"{label}: [ {x:.1f}, {y:.1f}]", True, (100, 100, 200))
+
+                # Draw text slightly offset so it doesn't overlap the line
+                self.screen.blit(text, (sx + 5, sy - 15))
 
     def draw_walked_path(self, walked_path, blade_diameter):
         """Draw the walked path and blade area as a green line and shaded area."""

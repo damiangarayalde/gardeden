@@ -27,9 +27,9 @@ class UserController:
     def update(self, pygame, cart):
         keys = pygame.key.get_pressed()
         if keys[pygame.K_a]:
-            cart.angle -= self.angle_step
+            cart.y -= self.angle_step
         if keys[pygame.K_d]:
-            cart.angle += self.angle_step
+            cart.y += self.angle_step
         if keys[pygame.K_w]:
             cart.speed += self.speed_step
         if keys[pygame.K_s]:
@@ -59,6 +59,8 @@ class Thing:
         # self.closed_loop_controller = ClosedLoopController(self)
         self.turn_radius = config["cart"].get("turn_radius", 0.2)
         self.overlap = config["cart"].get("overlap", 0.2)
+        # NEW: index for path progress
+        self.current_path_index = 0
 
     def set_world_space(self, rect):
         self.world_rect = rect
@@ -77,6 +79,7 @@ class Thing:
                 turning_radius if turning_radius != float('inf') else 0
             self.angle += math.degrees(angular_velocity * dt)
             self.angle = normalize_angle(self.angle)
+
         angle_rad = math.radians(self.angle)
         dx = self.speed * math.cos(angle_rad) * dt
         dy = self.speed * math.sin(angle_rad) * dt
@@ -99,8 +102,9 @@ class Thing:
 
     def set_job_path(self, job_path):
         self.job_path = job_path
+        self.current_path_index = 0  # reset progress when new path is set
 
-    def pure_pursuit(self, lookahead=1, wheelbase=0.5):
+    def pure_pursuit(self, lookahead=1.5, wheelbase=0.5):
         """
         Uses self.cart.job_path for path following.
         """
@@ -109,37 +113,46 @@ class Thing:
             return 0.0  # No path, no steering
 
         x, y, theta_deg = self.get_pose()
-
         theta = math.radians(normalize_angle(theta_deg))
-
-        # Find the lookahead point
-        # (next point on the path at least lookahead distance away)
         path_xy = [(px, py) for px, py, _ in job_path]
 
-        for px, py in path_xy:
-            dist = math.hypot(px - x, py - y)
-            if dist >= lookahead:
-                target_x, target_y = px, py
-                break
-        else:
-            target_x, target_y = path_xy[-1]
+        # --- Find closest point to current position ---
+        dists = [math.hypot(px - x, py - y) for px, py in path_xy]
+        closest_index = int(min(range(len(dists)), key=lambda i: dists[i]))
 
-        # Transform target point to vehicle coordinates
+        # --- Scan forward from closest point to find lookahead target ---
+        target_x, target_y = path_xy[-1]  # fallback
+        for i in range(closest_index, len(path_xy)):
+            px, py = path_xy[i]
+            if math.hypot(px - x, py - y) >= lookahead:
+                target_x, target_y = px, py
+                self.current_path_index = i
+                break
+
+        # --- Transform target to local vehicle frame ---
         dx = target_x - x
         dy = target_y - y
         local_x = math.cos(-theta)*dx - math.sin(-theta)*dy
         local_y = math.sin(-theta)*dx + math.cos(-theta)*dy
 
-        if abs(local_y) < 1e-6:
+        if abs(local_y) < 1e-3:
             return 0.0
 
+        # Radius of curvature
         radius = (local_x**2 + local_y**2) / (2*local_y)
-        steering = math.atan2(wheelbase, radius)
+        steering = math.atan2(wheelbase, abs(radius))
+
+        # Sign: negative if target is to the left of cart
+        if local_x < 0:
+            steering = -steering
 
         print(
-            f"pose | theta={theta_deg:.2f}° \t| Steering: {steering:.2f} "
-            f"\t| Target: x={target_x:.2f} \t y={target_y:.2f}"
+            f"pose | theta={theta_deg:.1f}° "
+            f"| Steering: {math.degrees(steering):.2f} rad "
+            f"| Target: x={target_x:.1f}, Wheel={self.wheel_angle:.2f}, "
+            f"index={self.current_path_index}"
         )
+
         return steering
 
     def run_controller_step(self):
