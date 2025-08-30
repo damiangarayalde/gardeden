@@ -41,12 +41,13 @@ class Thing:
     def set_world_space(self, rect):
         self.world_rect = rect
 
-    def toggle_pause(self):
-        self.paused = not self.paused
-        self.update_speed()
+    # def toggle_pause(self):
+    #     self.paused = not self.paused
+    #     self.update_speed()
 
     def update_speed(self):
-        self.speed = 0.0 if self.paused else self.target_speed
+        # self.speed = 0.0 if self.paused else self.target_speed
+        self.speed = self.target_speed
 
     def set_pose(self, pose):
         self.x = pose[0]
@@ -56,7 +57,6 @@ class Thing:
 
     def estimate_next_pose(self, dt):
         """Provides the next estimated pose based on current config."""
-
         omega = (self.v_r - self.v_l) / self.wheel_base
 
         angle_rad = math.radians(self.angle)
@@ -127,11 +127,9 @@ class Thing:
             f"| v_l={self.v_l:.3f}, v_r={self.v_r:.3f}"
         )
 
-    def run_inputs_bindings(self, inputs):
+    def run_inputs_bindings(self, input):
 
-        if inputs:
-            print(f"User input: {inputs}")
-
+        if input:
            # for input in inputs:
             if input == "left":
                 self.y -= self.angle_step
@@ -145,13 +143,13 @@ class Thing:
                 self.toggle_pause()
 
     def run_controller(self, user_inputs, measured_cart_pose=None):
-        # this allow us to have multiple control strategies
 
         # update cart model pose based on observer data
         self.set_pose(measured_cart_pose)
+
         # update the cart config based on user inputs
         self.run_inputs_bindings(user_inputs)
-        print(f"User input: {user_inputs}")
 
+        self.update_speed()
         # run the path following controller
         self.pure_pursuit()

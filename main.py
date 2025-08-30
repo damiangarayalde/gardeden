@@ -39,6 +39,8 @@ while running:
 
     clock.tick(FPS)  # running for real this goes away
 
+    user_inputs = ""
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
