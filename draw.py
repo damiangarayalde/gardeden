@@ -1,6 +1,7 @@
 import pygame
 import math
 import yaml
+import random
 
 
 class Drawer:
@@ -26,9 +27,6 @@ class Drawer:
         self.set_cart_size(rect=cart.rect,
                            blade_pos=cart.blade_pos,
                            blade_diameter=cart.blade_diameter)
-        # self.set_cart_size(rect=config["cart"]["rect"],
-        #                    blade_pos=config["cart"]["blade_pos"],
-        #                    blade_diameter=config["cart"]["blade_diameter"])
 
     def set_world_space(self, rect):
         """Map rect to 80% of window, keep aspect ratio."""
@@ -146,7 +144,8 @@ class Drawer:
         if job_path and len(job_path) > 1:
             job_path_screen = [self.map_to_screen(
                 x, y) for x, y, *_ in job_path]
-            pygame.draw.lines(self.screen, (0, 0, 200),
+
+            pygame.draw.lines(self.screen, (10, 10, 20),
                               False, job_path_screen, 2)
 
     def draw_walked_path(self, walked_path, blade_diameter):
@@ -156,7 +155,7 @@ class Drawer:
                 x, y) for x, y in walked_path]
             blade_radius = int(blade_diameter * self.scale // 2)
             for pos in walked_path_screen:
-                pygame.draw.circle(self.screen, (180, 255, 180),
+                pygame.draw.circle(self.screen, (50, 120, 50),
                                    (int(pos[0]), int(pos[1])), blade_radius)
             pygame.draw.lines(self.screen, (0, 150, 0), False,
                               walked_path_screen, 2)
@@ -166,7 +165,17 @@ class Drawer:
         Draws the entire simulation scene: job path, walked path, and cart.
         All cart details are retrieved from the cart instance.
         """
-        self.screen.fill((240, 240, 240))
+        # Fill background with dark green and texture
+        dark_green = (30, 70, 30)
+        self.screen.fill(dark_green)
+
+        # Add a simple grass texture: draw random lighter green dots
+        grass_color = (50, 120, 50)
+        # for _ in range(600):  # Adjust for density
+        #     gx = random.randint(0, self.window_size[0] - 1)
+        #     gy = random.randint(0, self.window_size[1] - 1)
+        #     pygame.draw.circle(self.screen, grass_color, (gx, gy), 1)
+
         self.draw_job_path(job_path)
         self.draw_walked_path(
             cart.get_walked_path(),

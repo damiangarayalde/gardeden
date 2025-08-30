@@ -1,10 +1,22 @@
 import math
 import yaml
-from controller import ClosedLoopController
+# from controller import ClosedLoopController
+
+
+def normalize_angle(angle_deg: float) -> float:
+    """
+    Normalize an angle to the range [-180, 180) degrees.
+    """
+    # First wrap to [0, 360)
+    wrapped = angle_deg % 360
+    # Shift to [-180, 180)
+    if wrapped >= 180:
+        wrapped -= 360
+    return wrapped
 
 
 class UserController:
-    def __init__(self, angle_step=20, speed_step=0.002):
+    def __init__(self, angle_step=0.02, speed_step=0.002):
         self.angle_step = angle_step
         self.speed_step = speed_step
 
@@ -22,8 +34,6 @@ class UserController:
             cart.speed += self.speed_step
         if keys[pygame.K_s]:
             cart.speed -= self.speed_step
-        else:
-            cart.angle = 0.0
 
 
 class Thing:
@@ -46,7 +56,7 @@ class Thing:
         self.user_controller = UserController(
             config["cart"]["angle_step"], config["cart"]["speed_step"])
         self.job_path = None
-        self.closed_loop_controller = ClosedLoopController(self)
+        # self.closed_loop_controller = ClosedLoopController(self)
         self.turn_radius = config["cart"].get("turn_radius", 0.2)
         self.overlap = config["cart"].get("overlap", 0.2)
 
@@ -61,11 +71,12 @@ class Thing:
     def update_pose(self, dt):
         if self.speed != 0:
             turning_radius = self.wheel_base / \
-                math.tan(self.wheel_angle
+                math.tan(math.radians(self.wheel_angle)
                          ) if self.wheel_angle != 0 else float('inf')
             angular_velocity = self.speed / \
                 turning_radius if turning_radius != float('inf') else 0
             self.angle += math.degrees(angular_velocity * dt)
+            self.angle = normalize_angle(self.angle)
         angle_rad = math.radians(self.angle)
         dx = self.speed * math.cos(angle_rad) * dt
         dy = self.speed * math.sin(angle_rad) * dt
@@ -89,9 +100,50 @@ class Thing:
     def set_job_path(self, job_path):
         self.job_path = job_path
 
+    def pure_pursuit(self, lookahead=1, wheelbase=0.5):
+        """
+        Uses self.cart.job_path for path following.
+        """
+        job_path = self.job_path
+        if not job_path:
+            return 0.0  # No path, no steering
+
+        x, y, theta_deg = self.get_pose()
+
+        theta = math.radians(normalize_angle(theta_deg))
+
+        # Find the lookahead point
+        # (next point on the path at least lookahead distance away)
+        path_xy = [(px, py) for px, py, _ in job_path]
+
+        for px, py in path_xy:
+            dist = math.hypot(px - x, py - y)
+            if dist >= lookahead:
+                target_x, target_y = px, py
+                break
+        else:
+            target_x, target_y = path_xy[-1]
+
+        # Transform target point to vehicle coordinates
+        dx = target_x - x
+        dy = target_y - y
+        local_x = math.cos(-theta)*dx - math.sin(-theta)*dy
+        local_y = math.sin(-theta)*dx + math.cos(-theta)*dy
+
+        if abs(local_y) < 1e-6:
+            return 0.0
+
+        radius = (local_x**2 + local_y**2) / (2*local_y)
+        steering = math.atan2(wheelbase, radius)
+
+        print(
+            f"pose | theta={theta_deg:.2f}° \t| Steering: {steering:.2f} "
+            f"\t| Target: x={target_x:.2f} \t y={target_y:.2f}"
+        )
+        return steering
+
     def run_controller_step(self):
 
-        self.wheel_angle = self.closed_loop_controller.pure_pursuit()
-        # = wheel_angle_rad#max(-45,
-        #   min(45, math.degrees(wheel_angle_rad)))
+        wheel_angle_rad = self.pure_pursuit()
+        self.wheel_angle = max(-45, min(45, math.degrees(wheel_angle_rad)))
         self.update_pose(dt=1.0)
