@@ -26,11 +26,9 @@ class UserController:
         if keys[pygame.K_d]:  # spin right
             cart.y += self.angle_step
         if keys[pygame.K_w]:
-            cart.v_l += self.speed_step
-            cart.v_r += self.speed_step
+            cart.speed += self.speed_step
         if keys[pygame.K_s]:
-            cart.v_l -= self.speed_step
-            cart.v_r -= self.speed_step
+            cart.speed -= self.speed_step
 
 
 class Thing:
@@ -42,7 +40,7 @@ class Thing:
 
         self.rect = config["cart"]["rect"]
         self.world_rect = config["world"]["rect"]
-        self.set_initial_pose(pose=config["cart"]["initial_pose"])
+        self.set_pose(pose=config["cart"]["initial_pose"])
         self.speed = 0.0
         self.wheel_angle = 0.0
         self.wheel_base = config["cart"]["wheel_base"]
@@ -63,14 +61,14 @@ class Thing:
     def set_world_space(self, rect):
         self.world_rect = rect
 
-    def set_initial_pose(self, pose):
+    def set_pose(self, pose):
         self.x = pose[0]
         self.y = pose[1]
         self.angle = pose[2]  # degrees
 
-    def update_pose(self, dt):
-        """Update robot pose using differential drive model."""
-        self.speed = (self.v_r + self.v_l) / 2.0
+    def estimate_next_pose(self, dt):
+        """Provides the next estimated pose based on current config."""
+        # self.speed = (self.v_r + self.v_l) / 2.0
         self.wheel_angle = (self.v_r - self.v_l) / self.wheel_base
 
         angle_rad = math.radians(self.angle)
@@ -95,7 +93,7 @@ class Thing:
         self.job_path = job_path
         self.current_path_index = 0
 
-    def pure_pursuit(self, lookahead=1.0):
+    def pure_pursuit(self, lookahead=0.1):
         """Pure pursuit for differential drive: outputs left/right wheel speeds."""
         if not self.job_path:
             return 0.0, 0.0
@@ -124,28 +122,20 @@ class Thing:
         local_y = math.sin(-theta) * dx + math.cos(-theta) * dy
 
         # Simple wheel command logic
-        base_speed = 0.01
-        k_turn = 0.8
+        k_turn = 0.99
 
-        v_l = base_speed
-        v_r = base_speed
-
-        if local_y > 0.1:   # carrot to left
-            v_l = self.speed/2*(1 - k_turn)
-            v_r = self.speed/2*(1 + k_turn)
-        elif local_y < -0.1:  # carrot to right
-            v_l = self.speed/2*(1 + k_turn)
-            v_r = self.speed/2*(1 - k_turn)
+        if local_y > 0.001:   # carrot to left
+            self.v_l = self.speed/2*(1 - k_turn)
+            self.v_r = self.speed/2*(1 + k_turn)
+        elif local_y < -0.001:  # carrot to right
+            self.v_l = self.speed/2*(1 + k_turn)
+            self.v_r = self.speed/2*(1 - k_turn)
 
         print(
             f"pose | θ={theta_deg:.1f}° "
-            f"| carrot local=({local_x:.2f}, {local_y:.2f}) "
-            f"| v_l={v_l:.3f}, v_r={v_r:.3f}"
+            f"| carrot local=({local_x:.2f},\t speed: {self.speed:.2f}) "
+            f"| v_l={self.v_l:.3f}, v_r={self.v_r:.3f}"
         )
 
-        return v_l, v_r
-
-    def run_controller_step(self):
-        v_l, v_r = self.pure_pursuit()
-        self.v_l, self.v_r = v_l, v_r
-        self.update_pose(dt=1.0)
+    def run_controller(self):
+        self.pure_pursuit()
