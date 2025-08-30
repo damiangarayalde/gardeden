@@ -10,7 +10,7 @@ def normalize_angle(angle_deg: float) -> float:
     return wrapped
 
 
-class UserController:
+class UserUI:
     def __init__(self, angle_step=0.2, speed_step=0.002):
         self.angle_step = angle_step
         self.speed_step = speed_step
@@ -19,8 +19,11 @@ class UserController:
         self.angle_step = angle_step
         self.speed_step = speed_step
 
-    def update(self, pygame, cart):
+    def check_for_inputs(self, pygame, cart):
         keys = pygame.key.get_pressed()
+
+        # this should be a dictionary or a config file with the controller bindings
+
         if keys[pygame.K_a]:  # spin left
             cart.y -= self.angle_step
         if keys[pygame.K_d]:  # spin right
@@ -47,12 +50,11 @@ class Thing:
         self.blade_pos = tuple(config["cart"]["blade_pos"])
         self.blade_diameter = config["cart"]["blade_diameter"]
         self.walked_path = []
-        self.user_controller = UserController(config["cart"]["speed_step"])
+        self.user_ui = UserUI(config["cart"]["speed_step"])
         self.job_path = None
         # self.closed_loop_controller = ClosedLoopController(self)
         self.turn_radius = config["cart"].get("turn_radius", 0.2)
         self.overlap = config["cart"].get("overlap", 0.2)
-        # NEW: index for path progress
         self.current_path_index = 0
         # Differential drive speeds
         self.v_l = 0.0  # left wheel

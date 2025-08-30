@@ -21,18 +21,21 @@ running = True
 
 while running:
 
-    clock.tick(FPS)
+    clock.tick(FPS)  # running for real this goes away
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
 
-    cart.user_controller.update(pygame, cart)
-    # future real world metrology with observer.retrieve_cart_pose()
-    cart_pose = cart.get_pose()
-    cart.set_pose(cart_pose)  # update cart pose based on observer data
+    measured_cart_pose = cart.estimate_next_pose(dt=1.0)
+    # measured_cart_pose = cart.observer.retrieve_cart_pose()     # Use real world metrology with
+
+    # update cart model pose based on observer data
+    cart.set_pose(measured_cart_pose)
+
+    cart.user_ui.check_for_inputs(pygame, cart)
+
     cart.run_controller()
-    cart.estimate_next_pose(dt=1.0)
 
     drawer.draw_scene(
         job_path,
@@ -40,10 +43,3 @@ while running:
     )
 
 pygame.quit()
-
-
-##
-
-# at high level, we need to control  speed of the cart
-# we have to ask the observer to tell us the position of the cart
-# we have to run the control loop step
