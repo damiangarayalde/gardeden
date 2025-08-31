@@ -25,7 +25,7 @@ class Thing:
         self.set_pose(pose=config["cart"]["initial_pose"])
         self.speed = 0.0
         self.target_speed = 0.0
-        self.wheel_base = config["cart"]["wheel_base"]
+        self.distance_between_wheels = config["cart"]["distance_between_wheels"]
         self.blade_pos = tuple(config["cart"]["blade_pos"])
         self.blade_diameter = config["cart"]["blade_diameter"]
         self.angle_step = config["cart"]["angle_step"]
@@ -41,13 +41,12 @@ class Thing:
     def set_world_space(self, rect):
         self.world_rect = rect
 
-    # def toggle_pause(self):
-    #     self.paused = not self.paused
-    #     self.update_speed()
+    def toggle_pause(self):
+        self.paused = not self.paused
+        self.update_speed()
 
     def update_speed(self):
-        # self.speed = 0.0 if self.paused else self.target_speed
-        self.speed = self.target_speed
+        self.speed = 0.0 if self.paused else self.target_speed
 
     def set_pose(self, pose):
         self.x = pose[0]
@@ -57,7 +56,7 @@ class Thing:
 
     def estimate_next_pose(self, dt):
         """Provides the next estimated pose based on current config."""
-        omega = (self.v_r - self.v_l) / self.wheel_base
+        omega = (self.v_r - self.v_l) / self.distance_between_wheels
 
         angle_rad = math.radians(self.angle)
         x = self.x + self.speed * math.cos(angle_rad) * dt
@@ -80,8 +79,8 @@ class Thing:
         self.job_path = job_path
         self.current_path_index = 0
 
-    def pure_pursuit(self, lookahead=0.1):
-        """Pure pursuit for differential drive: outputs left/right wheel speeds."""
+    def pure_pursuit(self, lookahead=0.2):
+        """Pure pursuit controller for differential drive."""
         if not self.job_path:
             return 0.0, 0.0
 
@@ -89,11 +88,11 @@ class Thing:
         theta = math.radians(normalize_angle(theta_deg))
         path_xy = [(px, py) for px, py, _ in self.job_path]
 
-        # Find closest point
+        # --- Find closest path point ---
         dists = [math.hypot(px - x, py - y) for px, py in path_xy]
         closest_index = int(min(range(len(dists)), key=lambda i: dists[i]))
 
-        # Find carrot point
+        # --- Find carrot point (first point beyond lookahead) ---
         carrot_x, carrot_y = path_xy[-1]
         for i in range(closest_index + 1, len(path_xy)):
             px, py = path_xy[i]
@@ -102,35 +101,36 @@ class Thing:
                 self.current_path_index = i
                 break
 
-        # Transform carrot to local frame
+        # --- Transform carrot point to local frame ---
         dx = carrot_x - x
         dy = carrot_y - y
         local_x = math.cos(-theta) * dx - math.sin(-theta) * dy
         local_y = math.sin(-theta) * dx + math.cos(-theta) * dy
 
-        # Simple wheel command logic
-        k_turn = 0.99
+        # --- Compute curvature (kappa) ---
+        Ld = math.hypot(local_x, local_y)
+        if Ld < 1e-6:
+            kappa = 0.0
+        else:
+            kappa = (2 * local_y) / (Ld * Ld)
 
-        if local_y > 0.01:   # carrot to left
-            self.v_l = self.speed/2*(1 - k_turn)
-            self.v_r = self.speed/2*(1 + k_turn)
-        elif local_y < -0.01:  # carrot to right
-            self.v_l = self.speed/2*(1 + k_turn)
-            self.v_r = self.speed/2*(1 - k_turn)
-        else:  # go straight
-            self.v_l = self.speed/2
-            self.v_r = self.speed/2
+        # --- Desired angular velocity ---
+        omega = self.speed * kappa
+
+        # --- Convert to wheel speeds (differential drive) ---
+        self.v_l = self.speed - 0.5 * self.distance_between_wheels * omega
+        self.v_r = self.speed + 0.5 * self.distance_between_wheels * omega
 
         print(
-            f"pose | θ={theta_deg:.1f}° | k_turn={k_turn:.1f}%"
-            f"| carrot local=({local_x:.2f},\t speed: {self.speed:.2f}) "
+            f"pose | θ={theta_deg:.1f}° "
+            f"| carrot local=({local_x:.2f}, {local_y:.2f}) "
+            f"| kappa={kappa:.3f}, ω={omega:.3f} "
             f"| v_l={self.v_l:.3f}, v_r={self.v_r:.3f}"
         )
 
     def run_inputs_bindings(self, input):
 
         if input:
-           # for input in inputs:
             if input == "left":
                 self.y -= self.angle_step
             elif input == "right":

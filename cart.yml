@@ -6,7 +6,7 @@ cart:
   rect: [0, 0, 0.3, 0.4]  # grande
   blade_pos: [0, 0]
   blade_diameter: 0.3
-  wheel_base: 0.4
+  distance_between_wheels: 0.4
   angle_step: 0.2
   speed_step: 0.005
   initial_pose: [0, 0, 0]
