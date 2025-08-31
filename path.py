@@ -12,7 +12,7 @@ def lane_spacing_from(blade_ef_diam, overlap):
     return blade_ef_diam * (1 - overlap)
 
 
-def dubins_segment(q0, q1, turn_radius, step=0.05):
+def dubins_segment(q0, q1, turn_radius, step=0.5):
     """
     q0, q1: (x, y, theta) in meters/radians
     turn_radius: meters (rho)
@@ -24,7 +24,7 @@ def dubins_segment(q0, q1, turn_radius, step=0.05):
     return [(x, y, angle_wrap(yaw)) for (x, y, yaw) in configs]
 
 
-def get_job_path(cart, start_pose=None, row_heading=0.0, sample_step=0.05):
+def get_job_path(cart, start_pose=None, row_heading=0.0, sample_step=0.01):
     """
     cart: Thing instance
     start_pose, row_heading, sample_step: as before

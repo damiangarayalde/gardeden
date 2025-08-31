@@ -14,12 +14,18 @@ def get_user_inputs(key):
         input = "left"
     elif key == pygame.K_d:  # spin right
         input = "right"
+    elif key == pygame.K_z:
+        input = "disturb_left"
+    elif key == pygame.K_c:
+        input = "disturb_right"
     elif key == pygame.K_w:
         input = "move_faster"
     elif key == pygame.K_s:
         input = "move_slower"
     elif key == pygame.K_p:
         input = "toggle_pause"
+    elif key == pygame.K_t:
+        input = "toggle_tracking"
     return input
 
 

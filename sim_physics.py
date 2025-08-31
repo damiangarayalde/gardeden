@@ -18,18 +18,22 @@ class Thing:
             config = yaml.safe_load(f)
 
         self.paused = False
+        self.tracking_active = False
         self.rect = config["cart"]["rect"]
         self.world_rect = config["world"]["rect"]
         self.walked_path = []
 
         self.set_pose(pose=config["cart"]["initial_pose"])
         self.speed = 0.0
+        self.omega = 0.0
         self.target_speed = 0.0
         self.distance_between_wheels = config["cart"]["distance_between_wheels"]
         self.blade_pos = tuple(config["cart"]["blade_pos"])
         self.blade_diameter = config["cart"]["blade_diameter"]
-        self.angle_step = config["cart"]["angle_step"]
+        self.lateral_disturbance = config["cart"]["lateral_disturbance"]
         self.speed_step = config["cart"]["speed_step"]
+        self.angle_step = config["cart"]["angle_step"]
+
         self.job_path = None
         self.turn_radius = config["cart"].get("turn_radius", 0.2)
         self.overlap = config["cart"].get("overlap", 0.2)
@@ -45,8 +49,28 @@ class Thing:
         self.paused = not self.paused
         self.update_speed()
 
-    def update_speed(self):
-        self.speed = 0.0 if self.paused else self.target_speed
+    def toggle_tracking(self):
+        self.tracking_active = not self.tracking_active
+
+    def update_speed(self, speed_step=0.0):
+        if self.paused:
+            self.speed = 0.0
+        else:
+            self.target_speed += speed_step
+            self.speed = self.target_speed
+
+    def perturb_laterally(self, displacement=0.0):
+        self.y += displacement
+
+    def adjust_wheels_speeds_with_omega(self, omega):
+        # --- Convert to wheel speeds (differential drive) ---
+        self.v_l = self.speed - 0.5 * self.distance_between_wheels * omega
+        self.v_r = self.speed + 0.5 * self.distance_between_wheels * omega
+
+    def update_direction(self, angle_step=0.0):
+        # --- Convert to wheel speeds (differential drive) ---
+        self.omega += angle_step
+        self.adjust_wheels_speeds_with_omega(self.omega)
 
     def set_pose(self, pose):
         self.x = pose[0]
@@ -79,10 +103,13 @@ class Thing:
         self.job_path = job_path
         self.current_path_index = 0
 
-    def pure_pursuit(self, lookahead=0.2):
+    def pure_pursuit(self, base_lookahead=0.2):
         """Pure pursuit controller for differential drive."""
         if not self.job_path:
             return 0.0, 0.0
+
+        # scale factor that grows with speed
+        lookahead = base_lookahead + self.speed * 0.5
 
         x, y, theta_deg = self.get_pose()
         theta = math.radians(normalize_angle(theta_deg))
@@ -118,29 +145,27 @@ class Thing:
         omega = self.speed * kappa
 
         # --- Convert to wheel speeds (differential drive) ---
-        self.v_l = self.speed - 0.5 * self.distance_between_wheels * omega
-        self.v_r = self.speed + 0.5 * self.distance_between_wheels * omega
-
-        print(
-            f"pose | θ={theta_deg:.1f}° "
-            f"| carrot local=({local_x:.2f}, {local_y:.2f}) "
-            f"| kappa={kappa:.3f}, ω={omega:.3f} "
-            f"| v_l={self.v_l:.3f}, v_r={self.v_r:.3f}"
-        )
+        self.adjust_wheels_speeds_with_omega(omega)
 
     def run_inputs_bindings(self, input):
 
         if input:
             if input == "left":
-                self.y -= self.angle_step
+                self.update_direction(self.angle_step)
             elif input == "right":
-                self.y += self.angle_step
+                self.update_direction(-self.angle_step)
+            elif input == "disturb_left":
+                self.perturb_laterally(self.lateral_disturbance)
+            elif input == "disturb_right":
+                self.perturb_laterally(-self.lateral_disturbance)
             elif input == "move_faster":
-                self.target_speed += self.speed_step
+                self.update_speed(+self.speed_step)
             elif input == "move_slower":
-                self.target_speed -= self.speed_step
+                self.update_speed(-self.speed_step)
             elif input == "toggle_pause":
                 self.toggle_pause()
+            elif input == "toggle_tracking":
+                self.toggle_tracking()
 
     def run_controller(self, user_inputs, measured_cart_pose=None):
 
@@ -150,6 +175,7 @@ class Thing:
         # update the cart config based on user inputs
         self.run_inputs_bindings(user_inputs)
 
-        self.update_speed()
+        # self.update_speed()
         # run the path following controller
-        self.pure_pursuit()
+        if self.tracking_active:
+            self.pure_pursuit()
