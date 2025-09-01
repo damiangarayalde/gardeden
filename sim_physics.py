@@ -1,5 +1,6 @@
 import math
 import yaml
+from enum import Enum
 
 
 def normalize_angle(angle_deg: float) -> float:
@@ -10,116 +11,184 @@ def normalize_angle(angle_deg: float) -> float:
     return wrapped
 
 
-class Thing:
+class ControlInput(Enum):
+    """Manual control inputs for the cart."""
+    TURN_LEFT = "left"
+    TURN_RIGHT = "right"
+    DISTURB_LEFT = "disturb_left"
+    DISTURB_RIGHT = "disturb_right"
+    FASTER = "move_faster"
+    SLOWER = "move_slower"
+    TOGGLE_PAUSE = "toggle_pause"
+    TOGGLE_TRACKING = "toggle_tracking"
+
+
+class CartSpecs:
+    """Static configuration parameters of the cart (do not change over time)."""
+
+    def __init__(self, config: dict):
+        self.rect = config["rect"]
+        self.distance_between_wheels = config["distance_between_wheels"]
+        self.blade_pos = tuple(config["blade_pos"])
+        self.blade_diameter = config["blade_diameter"]
+        self.lateral_disturbance = config["lateral_disturbance"]
+        self.speed_step = config["speed_step"]
+        self.angle_step = config["angle_step"]
+        self.turn_radius = config.get("turn_radius", 0.2)
+        self.overlap = config.get("overlap", 0.2)
+
+
+class CartState:
+    """Time-varying state of the cart (changes as it moves)."""
+
+    def __init__(self, initial_pose):
+        self.x, self.y, self.heading_deg = initial_pose   # (m, m, deg)
+        self.speed = 0.0              # current linear speed
+        self.target_speed = 0.0       # desired linear speed
+        self.angular_speed = 0.0      # yaw rate (rad/s)
+        self.v_left = 0.0             # left wheel linear speed
+        self.v_right = 0.0            # right wheel linear speed
+        self.walked_path = [(self.x, self.y)]
+
+
+class Cart:
+    """Main cart model, including specs, state, and control logic."""
 
     def __init__(self, initial_config="config.yml"):
         # Load config
         with open(initial_config, "r") as f:
             config = yaml.safe_load(f)
 
+        # Separate static and dynamic parts
+        self.specs = CartSpecs(config["cart"])
+        self.state = CartState(initial_pose=(0, 0, 0))  # x,y, angle in degrees
+        self.world_rect = config["world"]["rect"]
+
+        # Task/path-following parameters
+        self.job_path = None
+        self.current_path_index = 0
+
+        # Flags
         self.paused = False
         self.tracking_active = False
-        self.rect = config["cart"]["rect"]
-        self.world_rect = config["world"]["rect"]
-        self.walked_path = []
 
-        self.set_pose(pose=config["cart"]["initial_pose"])
-        self.speed = 0.0
-        self.omega = 0.0
-        self.target_speed = 0.0
-        self.distance_between_wheels = config["cart"]["distance_between_wheels"]
-        self.blade_pos = tuple(config["cart"]["blade_pos"])
-        self.blade_diameter = config["cart"]["blade_diameter"]
-        self.lateral_disturbance = config["cart"]["lateral_disturbance"]
-        self.speed_step = config["cart"]["speed_step"]
-        self.angle_step = config["cart"]["angle_step"]
+    # -------------------------------------------------------------------------
+    # Retrievers for cart parameters needed by other modules
+    # -------------------------------------------------------------------------
+    def get_walked_path(self):
+        return self.state.walked_path
 
-        self.job_path = None
-        self.turn_radius = config["cart"].get("turn_radius", 0.2)
-        self.overlap = config["cart"].get("overlap", 0.2)
-        self.current_path_index = 0
-        # Differential drive speeds
-        self.v_l = 0.0  # left wheel
-        self.v_r = 0.0  # right wheel
+    def get_blade_diameter(self):
+        return self.specs.blade_diameter
 
-    def set_world_space(self, rect):
-        self.world_rect = rect
+    # -------------------------------------------------------------------------
+    # State management
+    # -------------------------------------------------------------------------
+    def set_pose(self, pose):
+        """Update the cart's current pose."""
+        self.state.x, self.state.y, self.state.heading_deg = pose
+        self.state.heading_deg = normalize_angle(self.state.heading_deg)
+        self.state.walked_path.append((self.state.x, self.state.y))
 
+    def get_pose(self):
+        """Return the current pose (x, y, heading_deg)."""
+        return self.state.x, self.state.y, self.state.heading_deg
+
+    def estimate_next_pose(self, dt: float):
+        """Predict next pose given current speed and angular speed."""
+        omega = (self.state.v_right - self.state.v_left) / \
+            self.specs.distance_between_wheels
+
+        angle_rad = math.radians(self.state.heading_deg)
+
+        x = self.state.x + self.state.speed * math.cos(angle_rad) * dt
+        y = self.state.y + self.state.speed * math.sin(angle_rad) * dt
+
+        heading = normalize_angle(
+            self.state.heading_deg + math.degrees(omega * dt))
+
+        return x, y, heading
+
+    # -------------------------------------------------------------------------
+    # Control / inputs
+    # -------------------------------------------------------------------------
     def toggle_pause(self):
         self.paused = not self.paused
-        self.update_speed()
+        if self.paused:
+            self.state.speed = 0.0
 
     def toggle_tracking(self):
         self.tracking_active = not self.tracking_active
 
-    def update_speed(self, speed_step=0.0):
-        if self.paused:
-            self.speed = 0.0
-        else:
-            self.target_speed += speed_step
-            self.speed = self.target_speed
+    def change_speed(self, delta: float):
+        """Increase/decrease target speed by delta."""
+        if not self.paused:
+            self.state.target_speed += delta
+            self.state.speed = self.state.target_speed
 
-    def perturb_laterally(self, displacement=0.0):
-        self.y += displacement
+    # def set_world_space(self, rect):
+    #     self.world_rect = rect
 
-    def adjust_wheels_speeds_with_omega(self, omega):
-        # --- Convert to wheel speeds (differential drive) ---
-        self.v_l = self.speed - 0.5 * self.distance_between_wheels * omega
-        self.v_r = self.speed + 0.5 * self.distance_between_wheels * omega
+    def apply_lateral_disturbance(self, displacement: float):
+        """Simulate a lateral displacement disturbance."""
+        self.state.y += displacement
 
-    def update_direction(self, angle_step=0.0):
-        # --- Convert to wheel speeds (differential drive) ---
-        self.omega += angle_step
-        self.adjust_wheels_speeds_with_omega(self.omega)
+    def adjust_direction(self, angle_step: float):
+        """Change angular speed by adjusting heading rate."""
+        self.state.angular_speed += angle_step
+        self._update_wheel_speeds(self.state.angular_speed)
 
-    def set_pose(self, pose):
-        self.x = pose[0]
-        self.y = pose[1]
-        self.angle = pose[2]  # degrees
-        self.walked_path.append((self.x, self.y))
+    def _update_wheel_speeds(self, omega: float):
+        """Convert linear + angular velocity to differential wheel speeds."""
+        d = self.specs.distance_between_wheels
+        self.state.v_left = self.state.speed - 0.5 * d * omega
+        self.state.v_right = self.state.speed + 0.5 * d * omega
 
-    def estimate_next_pose(self, dt):
-        """Provides the next estimated pose based on current config."""
-        omega = (self.v_r - self.v_l) / self.distance_between_wheels
+    def apply_user_inputs(self, control: ControlInput):
+        """Apply a single manual control input to the cart."""
+        if control == ControlInput.TURN_LEFT:
+            self.adjust_direction(+self.specs.angle_step)
+        elif control == ControlInput.TURN_RIGHT:
+            self.adjust_direction(-self.specs.angle_step)
+        elif control == ControlInput.DISTURB_LEFT:
+            self.apply_lateral_disturbance(+self.specs.lateral_disturbance)
+        elif control == ControlInput.DISTURB_RIGHT:
+            self.apply_lateral_disturbance(-self.specs.lateral_disturbance)
+        elif control == ControlInput.FASTER:
+            self.change_speed(+self.specs.speed_step)
+        elif control == ControlInput.SLOWER:
+            self.change_speed(-self.specs.speed_step)
+        elif control == ControlInput.TOGGLE_PAUSE:
+            self.toggle_pause()
+        elif control == ControlInput.TOGGLE_TRACKING:
+            self.toggle_tracking()
 
-        angle_rad = math.radians(self.angle)
-        x = self.x + self.speed * math.cos(angle_rad) * dt
-        y = self.y + self.speed * math.sin(angle_rad) * dt
-        angle = normalize_angle(
-            self.angle + math.degrees(omega * dt))
-
-        return x, y, angle
-
-    def get_pose(self):
-        return self.x, self.y, self.angle
-
-    def get_walked_path(self):
-        return self.walked_path
-
-    def get_blade_diameter(self):
-        return self.blade_diameter
+    # -------------------------------------------------------------------------
+    # Path following (pure pursuit)
+    # -------------------------------------------------------------------------
 
     def set_job_path(self, job_path):
+        """Set the desired path for the cart to follow."""
         self.job_path = job_path
         self.current_path_index = 0
 
-    def pure_pursuit(self, base_lookahead=0.2):
-        """Pure pursuit controller for differential drive."""
+    def pure_pursuit(self, base_lookahead: float = 0.2):
+        """Run pure pursuit controller to follow the job path."""
         if not self.job_path:
-            return 0.0, 0.0
+            return
 
-        # scale factor that grows with speed
-        lookahead = base_lookahead + self.speed * 0.5
+        # dynamic lookahead that grows with speed
+        lookahead = base_lookahead + self.state.speed * 0.5
 
         x, y, theta_deg = self.get_pose()
-        theta = math.radians(normalize_angle(theta_deg))
+        theta = math.radians(theta_deg)
         path_xy = [(px, py) for px, py, _ in self.job_path]
 
-        # --- Find closest path point ---
+        # find closest path point
         dists = [math.hypot(px - x, py - y) for px, py in path_xy]
         closest_index = int(min(range(len(dists)), key=lambda i: dists[i]))
 
-        # --- Find carrot point (first point beyond lookahead) ---
+        # find carrot point beyond lookahead
         carrot_x, carrot_y = path_xy[-1]
         for i in range(closest_index + 1, len(path_xy)):
             px, py = path_xy[i]
@@ -128,54 +197,30 @@ class Thing:
                 self.current_path_index = i
                 break
 
-        # --- Transform carrot point to local frame ---
-        dx = carrot_x - x
-        dy = carrot_y - y
+        # transform carrot point to local frame
+        dx, dy = carrot_x - x, carrot_y - y
         local_x = math.cos(-theta) * dx - math.sin(-theta) * dy
         local_y = math.sin(-theta) * dx + math.cos(-theta) * dy
 
-        # --- Compute curvature (kappa) ---
+        # compute curvature (kappa)
         Ld = math.hypot(local_x, local_y)
-        if Ld < 1e-6:
-            kappa = 0.0
-        else:
-            kappa = (2 * local_y) / (Ld * Ld)
+        kappa = (2 * local_y) / (Ld * Ld) if Ld > 1e-6 else 0.0
 
-        # --- Desired angular velocity ---
-        omega = self.speed * kappa
+        # desired angular velocity
+        omega = self.state.speed * kappa
+        self._update_wheel_speeds(omega)
 
-        # --- Convert to wheel speeds (differential drive) ---
-        self.adjust_wheels_speeds_with_omega(omega)
-
-    def run_inputs_bindings(self, input):
-
-        if input:
-            if input == "left":
-                self.update_direction(self.angle_step)
-            elif input == "right":
-                self.update_direction(-self.angle_step)
-            elif input == "disturb_left":
-                self.perturb_laterally(self.lateral_disturbance)
-            elif input == "disturb_right":
-                self.perturb_laterally(-self.lateral_disturbance)
-            elif input == "move_faster":
-                self.update_speed(+self.speed_step)
-            elif input == "move_slower":
-                self.update_speed(-self.speed_step)
-            elif input == "toggle_pause":
-                self.toggle_pause()
-            elif input == "toggle_tracking":
-                self.toggle_tracking()
-
-    def run_controller(self, user_inputs, measured_cart_pose=None):
+    def run_controller(self, user_input: ControlInput = None, measured_pose=None):
+        """Update the cart state based on sensors and user input."""
 
         # update cart model pose based on observer data
-        self.set_pose(measured_cart_pose)
+        if measured_pose is not None:
+            self.set_pose(measured_pose)
 
         # update the cart config based on user inputs
-        self.run_inputs_bindings(user_inputs)
+        if user_input is not None:
+            self.apply_user_inputs(user_input)
 
-        # self.update_speed()
         # run the path following controller
         if self.tracking_active:
             self.pure_pursuit()

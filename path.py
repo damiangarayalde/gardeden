@@ -31,9 +31,9 @@ def get_job_path(cart, start_pose=None, row_heading=0.0, sample_step=0.01):
     Returns: list[(x,y,theta)] full path
     """
     rect = cart.world_rect
-    blade_ef_diam = cart.blade_diameter
-    overlap = cart.overlap
-    turn_radius = cart.turn_radius
+    blade_ef_diam = cart.specs.blade_diameter
+    overlap = cart.specs.overlap
+    turn_radius = cart.specs.turn_radius
 
     x_min, y_min, x_max, y_max = rect
     spacing = lane_spacing_from(blade_ef_diam, overlap)

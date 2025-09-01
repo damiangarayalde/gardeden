@@ -1,66 +1,66 @@
+from sim_physics import Cart, ControlInput
 import pygame
-import math
+# import math
 
-from sim_physics import Thing
 from draw import Drawer
 from path import get_job_path
 
 FPS = 30
 
 
-def get_user_inputs(key):
+FPS = 30
 
-    if key == pygame.K_a:  # spin left (just once per press)
-        input = "left"
-    elif key == pygame.K_d:  # spin right
-        input = "right"
+
+def get_user_input(key) -> ControlInput | None:
+    """Map pressed keys to cart control inputs."""
+    if key == pygame.K_a:          # spin left
+        return ControlInput.TURN_LEFT
+    elif key == pygame.K_d:        # spin right
+        return ControlInput.TURN_RIGHT
     elif key == pygame.K_z:
-        input = "disturb_left"
+        return ControlInput.DISTURB_LEFT
     elif key == pygame.K_c:
-        input = "disturb_right"
+        return ControlInput.DISTURB_RIGHT
     elif key == pygame.K_w:
-        input = "move_faster"
+        return ControlInput.FASTER
     elif key == pygame.K_s:
-        input = "move_slower"
+        return ControlInput.SLOWER
     elif key == pygame.K_p:
-        input = "toggle_pause"
+        return ControlInput.TOGGLE_PAUSE
     elif key == pygame.K_t:
-        input = "toggle_tracking"
-    return input
+        return ControlInput.TOGGLE_TRACKING
+    else:
+        return None
 
 
 pygame.init()
 clock = pygame.time.Clock()
 
-cart = Thing("cart.yml")
+cart = Cart("cart.yml")
 drawer = Drawer("graphics.yml", cart)
 
 job_path = get_job_path(cart)
 cart.set_job_path(job_path)
 
-user_inputs = ""
 running = True
 
 while running:
+    clock.tick(FPS)
 
-    clock.tick(FPS)  # running for real this goes away
-
-    user_inputs = ""
-
+    user_input = None
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.KEYDOWN:
-            user_inputs = get_user_inputs(event.key)
+            user_input = get_user_input(event.key)
 
+    # Predict next pose (or replace with observer input in real system)
     measured_cart_pose = cart.estimate_next_pose(dt=1.0)
-    # measured_cart_pose = cart.observer.retrieve_cart_pose()     # Use real world metrology with
 
-    cart.run_controller(user_inputs,  measured_cart_pose)
+    # Update cart state (handles manual + tracking)
+    cart.run_controller(user_input, measured_cart_pose)
 
-    drawer.draw_scene(
-        job_path,
-        cart
-    )
+    # Draw scene
+    drawer.draw_scene(job_path, cart)
 
 pygame.quit()

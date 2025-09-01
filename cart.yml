@@ -3,14 +3,13 @@ world:
   rect: [0, 0, 3.7, 1.1]  # chico
 
 cart:
+  # Fixed specs
   rect: [0, 0, 0.3, 0.4]  # grande
   blade_pos: [0, 0]
   blade_diameter: 0.3
   distance_between_wheels: 0.4
   lateral_disturbance: 0.2
   angle_step: 0.02
-
   speed_step: 0.005
-  initial_pose: [0, 0, 0]
   turn_radius: 0.2
   overlap: 0.1

@@ -24,9 +24,9 @@ class Drawer:
 
         self.set_world_space(cart.world_rect)
 
-        self.set_cart_size(rect=cart.rect,
-                           blade_pos=cart.blade_pos,
-                           blade_diameter=cart.blade_diameter)
+        self.set_cart_size(rect=cart.specs.rect,
+                           blade_pos=cart.specs.blade_pos,
+                           blade_diameter=cart.get_blade_diameter())
 
     def set_world_space(self, rect):
         """Map rect to 80% of window, keep aspect ratio."""
