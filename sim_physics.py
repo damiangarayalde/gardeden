@@ -21,6 +21,15 @@ class ControlInput(Enum):
     SLOWER = "move_slower"
     TOGGLE_PAUSE = "toggle_pause"
     TOGGLE_TRACKING = "toggle_tracking"
+    ANALOG = "analog"
+
+
+class AnalogInput:
+    """Analog joystick input: speed percentage & angular rate."""
+
+    def __init__(self, speed_percent: float = 0.0, omega: float = 0.0):
+        self.speed_percent = speed_percent  # -1.0 .. +1.0
+        self.omega = omega                  # rad/s
 
 
 class CartSpecs:
@@ -114,17 +123,35 @@ class Cart:
     # -------------------------------------------------------------------------
     def toggle_pause(self):
         self.paused = not self.paused
+        print(f"Paused: {self.paused}")
         if self.paused:
             self.state.speed = 0.0
 
     def toggle_tracking(self):
         self.tracking_active = not self.tracking_active
+        print(f"Tracking active: {self.tracking_active}")
+        self.state.speed = 0.0
+        self.state.target_speed = 0.0
+        self.state.angular_speed = 0.0
 
     def change_speed(self, delta: float):
         """Increase/decrease target speed by delta."""
         if not self.paused:
             self.state.target_speed += delta
             self.state.speed = self.state.target_speed
+
+    def set_speed_percent(self, percent: float):
+        """Set target speed based on joystick percentage of max speed."""
+        if not self.paused:
+            max_speed = self.specs.speed_step * 2  # example: scale step into max
+            self.state.target_speed = percent * max_speed
+            self.state.speed = self.state.target_speed
+
+    def set_angular_rate(self, omega: float):
+        """Set angular velocity directly (rad/s)."""
+        if not self.paused:
+            self.state.angular_speed = omega
+            self._update_wheel_speeds(self.state.angular_speed)
 
     # def set_world_space(self, rect):
     #     self.world_rect = rect
@@ -146,6 +173,14 @@ class Cart:
 
     def apply_user_inputs(self, control: ControlInput):
         """Apply a single manual control input to the cart."""
+
+        if isinstance(control, AnalogInput):
+            # Analog joystick input
+            self.set_speed_percent(control.speed_percent)
+            self.set_angular_rate(control.omega)
+            return
+
+        # Discrete keyboard-like commands
         if control == ControlInput.TURN_LEFT:
             self.adjust_direction(+self.specs.angle_step)
         elif control == ControlInput.TURN_RIGHT:
@@ -212,6 +247,8 @@ class Cart:
 
     def run_controller(self, user_input: ControlInput = None, measured_pose=None):
         """Update the cart state based on sensors and user input."""
+
+        print(f'speed: {100*self.state.speed:.2f} m/s, target speed: {100*self.state.target_speed:.2f} m/s, angular speed: {100*self.state.angular_speed:.2f} rad/s')
 
         # update cart model pose based on observer data
         if measured_pose is not None:

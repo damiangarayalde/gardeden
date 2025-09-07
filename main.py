@@ -1,7 +1,8 @@
-from sim_physics import Cart, ControlInput
+from sim_physics import Cart, ControlInput, AnalogInput
 import pygame
 from draw import Drawer
 from path import get_job_path
+
 
 FPS = 30
 
@@ -40,27 +41,33 @@ def get_joystick_input(joystick) -> ControlInput | None:
     # axis_y = joystick.get_axis(1)  # left stick vertical
 
     # for debugging: print all axes and buttons
-    print("Axes:", [joystick.get_axis(i)
-          for i in range(joystick.get_numaxes())])
+    # print("Axes:", [f"{joystick.get_axis(i):.2f}" for i in range(
+    #     joystick.get_numaxes())])
+
     # print("Buttons:", [joystick.get_button(i)
     #   for i in range(joystick.get_numbuttons())])
 
-    # Deadzone handling (ignore small noise)
+    # Deadzone
     deadzone = 0.2
-    if axis_x < -deadzone:
-        return ControlInput.TURN_LEFT
-    elif axis_x > deadzone:
-        return ControlInput.TURN_RIGHT
-    elif axis_y < -deadzone:
-        return ControlInput.FASTER
-    elif axis_y > deadzone:
-        return ControlInput.SLOWER
+    if abs(axis_x) < deadzone:
+        axis_x = 0.0
+    if abs(axis_y) < deadzone:
+        axis_y = 0.0
 
-    # Button mapping (check with print debug)
+    # Convert to analog control
+    # Y controls speed: up = forward, down = backward
+    speed_percent = -axis_y  # invert so up is +speed
+    # X controls turning rate
+    max_omega = 0.04  # 2.0  # rad/s, tune as needed
+    omega = axis_x * max_omega
+
+    if speed_percent != 0.0 or omega != 0.0:
+        return AnalogInput(speed_percent, omega)
+
+    # Buttons for discrete commands
     if joystick.get_button(5):  # center start button
         return ControlInput.TOGGLE_PAUSE
     elif joystick.get_button(6):  # options button
-        print("Toggle Tracking")
         return ControlInput.TOGGLE_TRACKING
     elif joystick.get_button(10):  # L1
         return ControlInput.DISTURB_LEFT
