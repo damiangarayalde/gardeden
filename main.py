@@ -34,8 +34,10 @@ def get_joystick_input(joystick) -> ControlInput | None:
     Adjust mapping for Kolke KGJ-182 if needed.
     """
     # Axes usually return values between -1.0 and 1.0
-    axis_x = joystick.get_axis(0)  # left stick horizontal
-    axis_y = joystick.get_axis(1)  # left stick vertical
+    axis_x = joystick.get_axis(1)  # left stick vertical
+    axis_y = joystick.get_axis(3)  # right stick vertical
+    # axis_x = joystick.get_axis(0)  # left stick horizontal
+    # axis_y = joystick.get_axis(1)  # left stick vertical
 
     # for debugging: print all axes and buttons
     print("Axes:", [joystick.get_axis(i)
@@ -56,12 +58,16 @@ def get_joystick_input(joystick) -> ControlInput | None:
 
     # Button mapping (check with print debug)
     if joystick.get_button(0):  # A / Cross
+        print("Toggle Pause")
         return ControlInput.TOGGLE_PAUSE
     elif joystick.get_button(1):  # B / Circle
+        print("Toggle Tracking")
         return ControlInput.TOGGLE_TRACKING
     elif joystick.get_button(2):  # X / Square
+        print("Disturb Left")
         return ControlInput.DISTURB_LEFT
     elif joystick.get_button(3):  # Y / Triangle
+        print("Disturb Right")
         return ControlInput.DISTURB_RIGHT
 
     return None
