@@ -212,6 +212,19 @@ running = True
 while running:
     clock.tick(FPS)
 
+    # -------------------------------------------------------------------
+    #  Updates cart pose based on metrology
+
+    # Predict next pose (or replace with observer input in real system)
+    measured_cart_pose = cart.estimate_next_pose(dt=1.0)
+
+    # update cart model pose based on observer data
+    if measured_cart_pose is not None:
+        cart.set_pose(measured_cart_pose)
+
+    # -------------------------------------------------------------------
+    # Check for inputs: local (keyboard or joystick + remote)
+
     user_input = None
     # inputs = {}
 
@@ -237,27 +250,26 @@ while running:
         if j_input is not None:
             user_input = j_input
 
+    # Check remote inputs
     # # Handle incoming data
     # remote_inputs = comm.receive()
+
+    # -------------------------------------------------------------------
+    #  Apply inputs to the cart controller
     # if remote_inputs:
     #     print("Remote inputs:", remote_inputs)
     #     cart.applyInputs(remote_inputs)
 
+    if user_input is not None:
+        cart.apply_inputs(user_input)
+
 #   // ===== UPDATE MOTORS =====
 #   //cart.updateMotors();
 
-    # Predict next pose (or replace with observer input in real system)
-    measured_cart_pose = cart.estimate_next_pose(dt=1.0)
-
-    # Update cart state (handles manual + tracking)
-    cart.run_controller(user_input, measured_cart_pose)
+    cart.run_controller()
 
     # Draw scene
     drawer.draw_scene(job_path, cart)
 
 
 pygame.quit()
-
-# desde la app tenemos que pasar info de los controles recibidos unicamente, por ej si se apreto p, t, w, s, a, d, z, c o si se movio el joystick +
-# info de la posicion del joystick
-# el mappeo de comandos a acciones del cart es una libreria del cart

@@ -79,20 +79,13 @@ class Cart:
 
         # Flags
         self.paused = False
-        self.tracking_active = False
+        self.tracking_enabled = False
 
-
-#  class CartController:
-#     def __init__(self, cart):
-#         self.cart = cart
-#         self.paused = False
-#         self.tracking_enabled = True
-#         self.speed_scale = 1.0
+        self.speed_scale = 1.0
 
     # -------------------------------------------------------------------------
     # Retrievers for cart parameters needed by other modules
     # -------------------------------------------------------------------------
-
 
     def get_walked_path(self):
         return self.state.walked_path
@@ -138,8 +131,8 @@ class Cart:
             self.state.speed = 0.0
 
     def toggle_tracking(self):
-        self.tracking_active = not self.tracking_active
-        print(f"Tracking active: {self.tracking_active}")
+        self.tracking_enabled = not self.tracking_enabled
+        print(f"Tracking active: {self.tracking_enabled}")
         self.state.speed = 0.0
         self.state.target_speed = 0.0
         self.state.angular_speed = 0.0
@@ -181,7 +174,7 @@ class Cart:
         self.state.v_left = self.state.speed - 0.5 * d * omega
         self.state.v_right = self.state.speed + 0.5 * d * omega
 
-    def apply_user_inputs(self, control: ControlInput):
+    def apply_inputs(self, control: ControlInput):
         """Apply a single manual control input to the cart."""
 
         if isinstance(control, AnalogInput):
@@ -208,6 +201,7 @@ class Cart:
         elif control == ControlInput.TOGGLE_TRACKING:
             self.toggle_tracking()
 
+    # @@@@@
     # def apply_inputs(self, inputs: dict):
     #     """
     #     Apply key/value inputs coming from joystick or keyboard.
@@ -265,6 +259,8 @@ class Cart:
 
         # if inputs.get("disturb_right"):
         #     self.cart.apply_disturbance(1.0)
+
+    # @@@@@
 
     def _apply_joystick(self, inputs: dict):
         """Handle analog joystick input."""
@@ -326,19 +322,11 @@ class Cart:
         omega = self.state.speed * kappa
         self._update_wheel_speeds(omega)
 
-    def run_controller(self, user_input: ControlInput = None, measured_pose=None):
+    def run_controller(self):
         """Update the cart state based on sensors and user input."""
 
         print(f'speed: {100*self.state.speed:.2f} m/s, target speed: {100*self.state.target_speed:.2f} m/s, angular speed: {100*self.state.angular_speed:.2f} rad/s')
 
-        # update cart model pose based on observer data
-        if measured_pose is not None:
-            self.set_pose(measured_pose)
-
-        # update the cart config based on user inputs
-        if user_input is not None:
-            self.apply_user_inputs(user_input)
-
         # run the path following controller
-        if self.tracking_active:
+        if self.tracking_enabled:
             self.pure_pursuit()
