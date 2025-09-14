@@ -35,17 +35,16 @@ def keyboard_to_kv(key) -> dict:
     return mapping.get(key, {})
 
 
-def joystick_to_kv(joystick) -> dict:
-    """
+def joystick_axes_to_kv(joystick) -> dict:
+    """Poll joystick axes every frame and return continuous inputs.
     Map joystick buttons/axes to ControlInput.
     Adjust mapping for Kolke KGJ-182 if needed.
     Return raw joystick state as key-value dict.
     """
-    # Axes usually return values between -1.0 and 1.0
     axis_omega = joystick.get_axis(JS_AXIS_LEFT_HORIZONTAL)
     axis_speed = joystick.get_axis(JS_AXIS_RIGHT_VERTICAL)
 
-    # Apply deadzone
+    # Deadzone
     deadzone = 0.2
     if abs(axis_omega) < deadzone:
         axis_omega = 0.0
@@ -53,13 +52,31 @@ def joystick_to_kv(joystick) -> dict:
         axis_speed = 0.0
 
     return {
-        "speed_percent":    int(-axis_speed * 255),   # forward/backward
-        "omega":            int(axis_omega * 255),
-        "toggle_pause":     1 if joystick.get_button(JS_BTN_START) else 0,
-        "toggle_tracking":  1 if joystick.get_button(JS_BTN_OPTIONS) else 0,
-        "disturb_left":     1 if joystick.get_button(JS_BTN_L1) else 0,
-        "disturb_right":    1 if joystick.get_button(JS_BTN_R1) else 0,
+        "speed_percent": int(-axis_speed * 255),  # forward/backward
+        "omega": int(axis_omega * 255),
     }
+
+
+def joystick_event_to_kv(event) -> dict:
+    """Handle joystick button events and return discrete inputs."""
+    if event.type == pygame.JOYBUTTONDOWN:
+        if event.button == JS_BTN_START:
+            return {"toggle_pause": 1}
+        elif event.button == JS_BTN_OPTIONS:
+            return {"toggle_tracking": 1}
+        elif event.button == JS_BTN_L1:
+            return {"disturb_left": 1}
+        elif event.button == JS_BTN_R1:
+            return {"disturb_right": 1}
+
+    elif event.type == pygame.JOYBUTTONUP:
+        # Release events (optional, e.g. reset toggle or send 0)
+        if event.button == JS_BTN_L1:
+            return {"disturb_left": 0}
+        elif event.button == JS_BTN_R1:
+            return {"disturb_right": 0}
+
+    return {}
 
 
 # ------------------------------ Init
@@ -108,10 +125,12 @@ while running:
             running = False
         elif event.type == pygame.KEYDOWN:
             inputs.update(keyboard_to_kv(event.key))
+        elif joystick and (event.type == pygame.JOYBUTTONDOWN or event.type == pygame.JOYBUTTONUP):
+            inputs.update(joystick_event_to_kv(event))
 
     # Poll joystick separately each frame
     if joystick:
-        inputs.update(joystick_to_kv(joystick))
+        inputs.update(joystick_axes_to_kv(joystick))
 
     # Handle incoming data
     # remote_inputs = comm.receive()
