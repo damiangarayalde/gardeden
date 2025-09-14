@@ -1,6 +1,5 @@
 import math
 import yaml
-from enum import Enum
 
 
 def normalize_angle(angle_deg: float) -> float:
@@ -9,27 +8,6 @@ def normalize_angle(angle_deg: float) -> float:
     if wrapped >= 180:
         wrapped -= 360
     return wrapped
-
-
-class ControlInput(Enum):
-    """Manual control inputs for the cart."""
-    TURN_LEFT = "left"
-    TURN_RIGHT = "right"
-    DISTURB_LEFT = "disturb_left"
-    DISTURB_RIGHT = "disturb_right"
-    FASTER = "move_faster"
-    SLOWER = "move_slower"
-    TOGGLE_PAUSE = "toggle_pause"
-    TOGGLE_TRACKING = "toggle_tracking"
-    ANALOG = "analog"
-
-
-class AnalogInput:
-    """Analog joystick input: speed percentage & angular rate."""
-
-    def __init__(self, speed_percent: float = 0.0, omega: float = 0.0):
-        self.speed_percent = speed_percent  # -1.0 .. +1.0
-        self.omega = omega                  # rad/s
 
 
 class CartSpecs:
@@ -80,8 +58,6 @@ class Cart:
         # Flags
         self.paused = False
         self.tracking_enabled = False
-
-        self.speed_scale = 1.0
 
     # -------------------------------------------------------------------------
     # Retrievers for cart parameters needed by other modules
@@ -174,106 +150,45 @@ class Cart:
         self.state.v_left = self.state.speed - 0.5 * d * omega
         self.state.v_right = self.state.speed + 0.5 * d * omega
 
-    def apply_inputs(self, control: ControlInput):
-        """Apply a single manual control input to the cart."""
+    def apply_inputs(self, inputs: dict):
+        """
+        Apply key/value inputs coming from joystick or keyboard.
+        Example inputs:
+          {"x": 120, "y": -20, "pause": 1, "faster": 1}
+        """
 
-        if isinstance(control, AnalogInput):
-            # Analog joystick input
-            self.set_speed_percent(control.speed_percent)
-            self.set_angular_rate(control.omega)
-            return
+        # Analog inputs
+        if "speed_percent" in inputs or "omega" in inputs:
+            self._apply_analog(inputs)
 
         # Discrete keyboard-like commands
-        if control == ControlInput.TURN_LEFT:
+        if inputs.get("turn_left"):
             self.adjust_direction(+self.specs.angle_step)
-        elif control == ControlInput.TURN_RIGHT:
+        if inputs.get("turn_right"):
             self.adjust_direction(-self.specs.angle_step)
-        elif control == ControlInput.DISTURB_LEFT:
-            self.apply_lateral_disturbance(+self.specs.lateral_disturbance)
-        elif control == ControlInput.DISTURB_RIGHT:
-            self.apply_lateral_disturbance(-self.specs.lateral_disturbance)
-        elif control == ControlInput.FASTER:
-            self.change_speed(+self.specs.speed_step)
-        elif control == ControlInput.SLOWER:
-            self.change_speed(-self.specs.speed_step)
-        elif control == ControlInput.TOGGLE_PAUSE:
+        if inputs.get("toggle_pause"):
             self.toggle_pause()
-        elif control == ControlInput.TOGGLE_TRACKING:
+        if inputs.get("toggle_tracking"):
             self.toggle_tracking()
+        if inputs.get("faster"):
+            self.change_speed(+self.specs.speed_step)
+        if inputs.get("slower"):
+            self.change_speed(-self.specs.speed_step)
+        if inputs.get("disturb_left"):
+            self.apply_lateral_disturbance(+self.specs.lateral_disturbance)
+        if inputs.get("disturb_right"):
+            self.apply_lateral_disturbance(-self.specs.lateral_disturbance)
 
-    # @@@@@
-    # def apply_inputs(self, inputs: dict):
-    #     """
-    #     Apply key/value inputs coming from joystick or keyboard.
-    #     Example inputs:
-    #       {"x": 120, "y": -20, "pause": 1, "faster": 1}
-    #     """
-    #     # Joystick axes (continuous control)
-    #     if "x" in inputs or "y" in inputs:
-    #         self._apply_joystick(inputs)
+    def _apply_analog(self, inputs: dict):
+        """Handle analog joystick-style inputs."""
+        # Normalize to [-1,1]
+        sp_norm = inputs.get("speed_percent", 0) / 255.0
+        omega_norm = inputs.get("omega", 0) / 255.0
 
-    #     # Discrete commands (toggles or impulses)
-    #     if inputs.get("pause"):
-    #         self.paused = not self.paused
-    #         print(f"[CartController] Pause toggled: {self.paused}")
-    #         if self.paused:
-    #             self.state.speed = 0.0
-
-    #     if inputs.get("tracking"):
-    #         self.tracking_enabled = not self.tracking_enabled
-    #         print(
-    #             f"[CartController] Tracking toggled: {self.tracking_enabled}")
-    #         self.state.speed = 0.0
-    #         self.state.target_speed = 0.0
-    #         self.state.angular_speed = 0.0
-
-        # def change_speed(self, delta: float):
-        #     """Increase/decrease target speed by delta."""
-        #     if not self.paused:
-        #         self.state.target_speed += delta
-        #         self.state.speed = self.state.target_speed
-
-        # def set_speed_percent(self, percent: float):
-        #     """Set target speed based on joystick percentage of max speed."""
-        #     if not self.paused:
-        #         max_speed = self.specs.speed_step * 2  # example: scale step into max
-        #         self.state.target_speed = percent * max_speed
-        #         self.state.speed = self.state.target_speed
-
-        # def set_angular_rate(self, omega: float):
-        #     """Set angular velocity directly (rad/s)."""
-        #     if not self.paused:
-        #         self.state.angular_speed = omega
-        #         self._update_wheel_speeds(self.state.angular_speed)
-
-        # if inputs.get("faster"):
-        #     self.speed_scale *= 1.1
-        #     print(f"[CartController] Speed scale: {self.speed_scale:.2f}")
-
-        # if inputs.get("slower"):
-        #     self.speed_scale *= 0.9
-        #     print(f"[CartController] Speed scale: {self.speed_scale:.2f}")
-
-        # if inputs.get("disturb_left"):
-        #     self.cart.apply_disturbance(-1.0)
-
-        # if inputs.get("disturb_right"):
-        #     self.cart.apply_disturbance(1.0)
-
-    # @@@@@
-
-    def _apply_joystick(self, inputs: dict):
-        """Handle analog joystick input."""
-        x = inputs.get("x", 0) / 255.0  # normalize back to [-1,1]
-        y = inputs.get("y", 0) / 255.0
-
-        # Example: map x-axis to cart velocity
-        velocity = x * self.speed_scale
-        self.cart.set_velocity(velocity)
-
-        # Example: map y-axis to pole angle target (if balancing)
-        target_angle = y * math.radians(15)
-        self.cart.set_target_angle(target_angle)
+        # Apply to cart
+        self.set_speed_percent(sp_norm)
+        max_turn_rate = 0.04  # rad/s, tune
+        self.set_angular_rate(omega_norm * max_turn_rate)
 
     # -------------------------------------------------------------------------
     # Path following (pure pursuit)
