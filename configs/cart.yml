@@ -13,3 +13,7 @@ cart:
   speed_step: 0.005
   turn_radius: 0.2
   overlap: 0.1
+  paused_at_beginning: True
+  tracking_enabled: False
+  cruise_speed: 0.01
+  horn: False

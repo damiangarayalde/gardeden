@@ -14,6 +14,7 @@ JS_BTN_OPTIONS = 6
 JS_BTN_START = 5
 JS_BTN_L1 = 10
 JS_BTN_R1 = 9
+JS_BTN_SQUARE = 2
 JS_AXIS_LEFT_HORIZONTAL = 0
 # JS_AXIS_LEFT_VERTICAL = 1
 # JS_AXIS_LEFT_HORIZONTAL = 2
@@ -68,6 +69,8 @@ def joystick_event_to_kv(event) -> dict:
             return {"disturb_left": 1}
         elif event.button == JS_BTN_R1:
             return {"disturb_right": 1}
+        elif event.button == JS_BTN_SQUARE:
+            return {"horn_pressed": 1}
 
     elif event.type == pygame.JOYBUTTONUP:
         # Release events (optional, e.g. reset toggle or send 0)
@@ -75,6 +78,8 @@ def joystick_event_to_kv(event) -> dict:
             return {"disturb_left": 0}
         elif event.button == JS_BTN_R1:
             return {"disturb_right": 0}
+        elif event.button == JS_BTN_SQUARE:
+            return {"horn_released": 1}
 
     return {}
 

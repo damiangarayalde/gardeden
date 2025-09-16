@@ -28,7 +28,7 @@ class CartSpecs:
 class CartState:
     """Time-varying state of the cart (changes as it moves)."""
 
-    def __init__(self, initial_pose):
+    def __init__(self, initial_pose, config: dict):
         self.x, self.y, self.heading_deg = initial_pose   # (m, m, deg)
         self.speed = 0.0              # current linear speed
         self.target_speed = 0.0       # desired linear speed
@@ -36,6 +36,10 @@ class CartState:
         self.v_left = 0.0             # left wheel linear speed
         self.v_right = 0.0            # right wheel linear speed
         self.walked_path = [(self.x, self.y)]
+        self.paused = config["paused_at_beginning"]
+        self.tracking_enabled = config["tracking_enabled"]
+        self.cruise_speed = config["cruise_speed"]
+        self.horn = config["horn"]
 
 
 class Cart:
@@ -48,16 +52,13 @@ class Cart:
 
         # Separate static and dynamic parts
         self.specs = CartSpecs(config["cart"])
-        self.state = CartState(initial_pose=(0, 0, 0))  # x,y, angle in degrees
+        # x,y, angle in degrees
+        self.state = CartState(initial_pose=(0, 0, 0), config=config["cart"])
         self.world_rect = config["world"]["rect"]
 
         # Task/path-following parameters
         self.job_path = None
         self.current_path_index = 0
-
-        # Flags
-        self.paused = False
-        self.tracking_enabled = False
 
     # -------------------------------------------------------------------------
     # Retrievers for cart parameters needed by other modules
@@ -101,34 +102,34 @@ class Cart:
     # Control / inputs
     # -------------------------------------------------------------------------
     def toggle_pause(self):
-        self.paused = not self.paused
-        print(f"Paused: {self.paused}")
-        if self.paused:
+        self.state.paused = not self.state.paused
+        print(f"Paused: {self.state.paused}")
+        if self.state.paused:
             self.state.speed = 0.0
 
     def toggle_tracking(self):
-        self.tracking_enabled = not self.tracking_enabled
-        print(f"Tracking active: {self.tracking_enabled}")
+        self.state.tracking_enabled = not self.state.tracking_enabled
+        print(f"Tracking active: {self.state.tracking_enabled}")
         self.state.speed = 0.0
         self.state.target_speed = 0.0
         self.state.angular_speed = 0.0
 
     def change_speed(self, delta: float):
         """Increase/decrease target speed by delta."""
-        if not self.paused:
+        if not self.state.paused:
             self.state.target_speed += delta
             self.state.speed = self.state.target_speed
 
     def set_speed_percent(self, percent: float):
         """Set target speed based on joystick percentage of max speed."""
-        if not self.paused:
+        if not self.state.paused:
             max_speed = self.specs.speed_step * 2  # example: scale step into max
             self.state.target_speed = percent * max_speed
             self.state.speed = self.state.target_speed
 
     def set_angular_rate(self, omega: float):
         """Set angular velocity directly (rad/s)."""
-        if not self.paused:
+        if not self.state.paused:
             self.state.angular_speed = omega
             self._update_wheel_speeds(self.state.angular_speed)
 
@@ -178,6 +179,13 @@ class Cart:
             self.apply_lateral_disturbance(+self.specs.lateral_disturbance)
         if inputs.get("disturb_right"):
             self.apply_lateral_disturbance(-self.specs.lateral_disturbance)
+        if inputs.get("horn_pressed"):
+            print("horn__PRESSSEDDDD")
+            self.state.horn = True
+        if inputs.get("horn_released"):
+            print("horn_______________________________reeeeeleaaaased")
+
+            self.state.horn = False
 
     def _apply_analog(self, inputs: dict):
         """Handle analog joystick-style inputs."""
@@ -243,5 +251,5 @@ class Cart:
         print(f'speed: {100*self.state.speed:.2f} m/s, target speed: {100*self.state.target_speed:.2f} m/s, angular speed: {100*self.state.angular_speed:.2f} rad/s')
 
         # run the path following controller
-        if self.tracking_enabled:
+        if self.state.tracking_enabled:
             self.pure_pursuit()

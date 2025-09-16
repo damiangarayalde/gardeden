@@ -1,7 +1,7 @@
 import pygame
 import math
 import yaml
-import random
+import time
 
 
 class Drawer:
@@ -67,7 +67,7 @@ class Drawer:
         sy = y * self.scale + self.offset[1]
         return sx, sy
 
-    def draw_cart(self, cart_pose):
+    def draw_cart(self, cart_pose, cart_rear_lights=False, cart_tracking_enabled=False, cart_horn_active=True):
         """
         Draws a cart at (x, y, heading) with given wheel angle.
         The cart is a square with a central circle and 4 wheels (rectangles).
@@ -90,11 +90,17 @@ class Drawer:
         pygame.draw.polygon(self.screen, (0, 100, 200), body_corners)
 
         # --- Draw central circle (blade) ---
+
+        if cart_horn_active:
+            circle_color = (100, 100, 210)
+        else:
+            circle_color = (120, 120, 250)
+
         blade_x = x + self.blade_pos[0] * self.scale * math.cos(
             heading_rad) - self.blade_pos[1] * self.scale * math.sin(heading_rad)
         blade_y = y + self.blade_pos[0] * self.scale * math.sin(
             heading_rad) + self.blade_pos[1] * self.scale * math.cos(heading_rad)
-        pygame.draw.circle(self.screen, (200, 200, 0), (int(blade_x), int(
+        pygame.draw.circle(self.screen, circle_color, (int(blade_x), int(
             blade_y)), int(self.blade_diameter * self.scale // 2))
 
         # --- Draw heading indicator (small line from center) ---
@@ -102,6 +108,63 @@ class Drawer:
         tip_x = x + tip_length * math.cos(heading_rad)
         tip_y = y + tip_length * math.sin(heading_rad)
         pygame.draw.line(self.screen, (255, 0, 0), (x, y), (tip_x, tip_y), 3)
+
+        # --- Draw rear lights ---
+
+        rear_x = -half  # back face along -X
+        light_w = cart_size * 0.07
+        light_h = cart_size * 0.15
+        side_offset = cart_size * 0.25  # push along Y (up/down from center)
+
+        # Blink control: 1 Hz (0.5s on, 0.5s off)
+        t = time.time()
+        blink_on = int(t % 1.0 < 0.5)
+
+        # Colors
+        blink_color = (255, 180, 0)   # bright amber
+        standby_color = (60, 30, 10)  # very dim amber
+
+        for side in [-1, 1]:  # bottom (-1), top (+1) relative to cart
+            dx_local = rear_x
+            dy_local = side * side_offset
+
+            # Rotate into world space
+            cx = x + dx_local * math.cos(heading_rad) - \
+                dy_local * math.sin(heading_rad)
+            cy = y + dx_local * math.sin(heading_rad) + \
+                dy_local * math.cos(heading_rad)
+
+            # Choose color
+            if cart_rear_lights:
+                color = blink_color if blink_on else standby_color
+            else:
+                color = standby_color
+
+            # Compute rectangle corners for each light (so it rotates with heading)
+            rect_corners = []
+            for ldx, ldy in [(-light_w/2, -light_h/2),
+                             (light_w/2, -light_h/2),
+                             (light_w/2,  light_h/2),
+                             (-light_w/2,  light_h/2)]:
+                lx = cx + ldx * math.cos(heading_rad) - \
+                    ldy * math.sin(heading_rad)
+                ly = cy + ldx * math.sin(heading_rad) + \
+                    ldy * math.cos(heading_rad)
+                rect_corners.append((lx, ly))
+
+            pygame.draw.polygon(self.screen, color, rect_corners)
+
+        # --- Draw forward tracking cone ---
+        if cart_tracking_enabled:
+            cone_length = half
+            cone_angle = math.radians(10)
+            angles = [heading_rad - cone_angle, heading_rad + cone_angle]
+            cone_points = [(x, y)]
+            for a in angles:
+                px = x + cone_length * math.cos(a)
+                py = y + cone_length * math.sin(a)
+                cone_points.append((px, py))
+            pygame.draw.polygon(self.screen, (255, 0, 0), cone_points, 0)
 
     def draw_job_path(self, job_path):
         """Draw the job path as a blue line, with labels at start, mid, end."""
@@ -170,7 +233,11 @@ class Drawer:
         )
 
         self.draw_cart(
-            cart.get_pose())
+            cart_pose=cart.get_pose(),
+            cart_rear_lights=cart.state.paused,
+            cart_tracking_enabled=cart.state.tracking_enabled,
+            cart_horn_active=cart.state.horn
+        )
 
         # Finally update the display
         pygame.display.flip()
