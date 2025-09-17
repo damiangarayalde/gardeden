@@ -127,10 +127,11 @@ class Cart:
             self.state.target_speed = percent * max_speed
             self.state.speed = self.state.target_speed
 
-    def set_angular_rate(self, omega: float):
+    def set_angular_rate(self, omega_percent: float):
         """Set angular velocity directly (rad/s)."""
         if not self.state.paused:
-            self.state.angular_speed = omega
+            max_omega = 0.04  # example: scale step into max
+            self.state.angular_speed = omega_percent * max_omega
             self._update_wheel_speeds(self.state.angular_speed)
 
     # def set_world_space(self, rect):
@@ -191,12 +192,11 @@ class Cart:
         """Handle analog joystick-style inputs."""
         # Normalize to [-1,1]
         sp_norm = inputs.get("speed_percent", 0) / 255.0
-        omega_norm = inputs.get("omega", 0) / 255.0
+        omega_norm = inputs.get("omega_percent", 0) / 255.0
 
         # Apply to cart
         self.set_speed_percent(sp_norm)
-        max_turn_rate = 0.04  # rad/s, tune
-        self.set_angular_rate(omega_norm * max_turn_rate)
+        self.set_angular_rate(omega_norm)
 
     # -------------------------------------------------------------------------
     # Path following (pure pursuit)
