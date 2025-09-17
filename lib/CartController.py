@@ -248,7 +248,10 @@ class Cart:
     def run_controller(self):
         """Update the cart state based on sensors and user input."""
 
-        print(f'speed: {100*self.state.speed:.2f} m/s, target speed: {100*self.state.target_speed:.2f} m/s, angular speed: {100*self.state.angular_speed:.2f} rad/s')
+        # printf("\033[A"); // ESC[A moves the cursor up one line
+        #                          printf("\033[2K");
+        #                          print(
+        #                              f'speed: {100*self.state.speed:.2f} m/s, target speed: {100*self.state.target_speed:.2f} m/s, angular speed: {100*self.state.angular_speed:.2f} rad/s')
 
         # run the path following controller
         if self.state.tracking_enabled:

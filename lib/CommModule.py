@@ -15,7 +15,7 @@ class CommModule:
         # UDP socket
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind((bind_ip, udp_port))
-        self.sock.settimeout(0.5)  # non-blocking-ish
+        self.sock.settimeout(0.2)  # non-blocking-ish
 
         print(f"[CommModule] Listening on {bind_ip}:{udp_port}")
 

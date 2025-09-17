@@ -8,7 +8,7 @@ from lib.CommModule import CommModule
 ESP32_IP = "192.168.0.16"
 ESP32_PORT = 4210
 LOCAL_IP = "0.0.0.0"   # listen on all interfaces
-FPS = 60
+FPS = 20
 
 JS_BTN_OPTIONS = 6
 JS_BTN_START = 5
@@ -54,7 +54,7 @@ def joystick_axes_to_kv(joystick) -> dict:
 
     return {
         "speed_percent": int(-axis_speed * 255),  # forward/backward
-        "omega": int(axis_omega * 255),
+        "omega_percent": int(axis_omega * 255),
     }
 
 
