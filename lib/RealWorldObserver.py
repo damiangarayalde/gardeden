@@ -17,10 +17,17 @@ class Observer:
 
         # Adjust units (cm, m, etc.)
         self.pts_world = np.array([
-            [0, 0],       # top-left
-            [4.8, 0],     # top-right
-            [4.8, 12.7],   # bottom-right
-            [0, 12.7]      # bottom-left
+            [0, 0],       # bottom-left
+            [0, 12.7],     # top-left
+            [4.8, 12.7],   # top-right
+            [4.8, 0]     # bottom-right
+
+
+
+            # [0, 0],       # top-left
+            # [4.8, 0],     # top-right
+            # [4.8, 12.7],   # bottom-right
+            # [0, 12.7]      # bottom-left
         ], dtype=np.float32)
 
         self.clicked_points = []
@@ -45,6 +52,24 @@ class Observer:
         xy1 = self.H @ uv1
         xy1 /= xy1[2]
         return float(xy1[0]), float(xy1[1])
+
+    def world_to_image(self, point):
+        """Map real-world (x,y) to image pixel (u,v)."""
+        if self.H is None:
+            raise ValueError("Homography not calibrated yet")
+        H_inv = np.linalg.inv(self.H)
+        xy1 = np.array([point[0], point[1], 1.0])
+        uv1 = H_inv @ xy1
+        uv1 /= uv1[2]
+        return int(uv1[0]), int(uv1[1])
+
+    def get_augmented_frame(self):
+        """
+        Return a fresh copy of the camera frame to draw AR overlays on.
+        """
+        if self.frame is None:
+            raise FileNotFoundError("No camera frame loaded")
+        return self.frame.copy()
 
     def mouse_callback(self, event, x, y, flags, param):
 

@@ -156,5 +156,6 @@ while running:
     cart.run_controller()
 
     drawer.draw_scene(job_path, cart)
+    ar_frame = drawer.draw_augmented_reality(observer, job_path, cart)
 
 pygame.quit()

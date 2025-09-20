@@ -2,6 +2,8 @@ import pygame
 import math
 import yaml
 import time
+import cv2
+import numpy as np
 
 
 class Drawer:
@@ -241,3 +243,58 @@ class Drawer:
 
         # Finally update the display
         pygame.display.flip()
+
+    def draw_augmented_reality(self, observer, job_path, cart, alpha=0.5):
+        """
+        Projects the rectangle, path, and cart over the real-world image
+        using the inverse homography. Returns an augmented reality frame.
+        """
+
+        # Step 1: Get a fresh copy of the observer's frame
+        frame = observer.get_augmented_frame()
+
+        # Step 2: Draw job path in image space
+        if job_path and len(job_path) > 1:
+            path_pixels = [observer.world_to_image(
+                (x, y)) for x, y, *_ in job_path]
+            cv2.polylines(frame, [np.int32(path_pixels)],
+                          False, (255, 0, 0), 2)
+
+        # Step 3: Draw walked path (blade coverage)
+        walked_path = cart.get_walked_path()
+        if walked_path and len(walked_path) > 1:
+            blade_radius = int(cart.get_blade_diameter() *
+                               10)  # scale up for visibility
+            for x, y in walked_path:
+                px, py = observer.world_to_image((x, y))
+                cv2.circle(frame, (px, py), blade_radius, (0, 200, 0), -1)
+
+        # Step 4: Draw cart (as polygon projected with homography)
+        x, y, heading = cart.get_pose()
+        half = self.cart_size / 2
+        heading_rad = math.radians(heading)
+
+        # Cart body corners in world coords
+        body_world = []
+        for dx, dy in [(-half, -half), (half, -half), (half, half), (-half, half)]:
+            bx = x + dx * math.cos(heading_rad) - dy * math.sin(heading_rad)
+            by = y + dx * math.sin(heading_rad) + dy * math.cos(heading_rad)
+            body_world.append((bx, by))
+
+        body_img = [observer.world_to_image(pt) for pt in body_world]
+        cv2.polylines(frame, [np.int32(body_img)], True, (0, 100, 200), 2)
+
+        # Draw heading line
+        tip_length = half
+        tip_x = x + tip_length * math.cos(heading_rad)
+        tip_y = y + tip_length * math.sin(heading_rad)
+        p1 = observer.world_to_image((x, y))
+        p2 = observer.world_to_image((tip_x, tip_y))
+        cv2.line(frame, p1, p2, (0, 0, 255), 2)
+
+        # Step 5: Blend augmented layer with real frame
+        blended = cv2.addWeighted(observer.frame, 1 - alpha, frame, alpha, 0)
+
+        cv2.imshow("Augmented Reality", blended)
+
+        return blended
