@@ -63,6 +63,45 @@ class Drawer:
     #         self.set_world_space(self.world_rect)
     #     # Optionally, redraw cart at new pose if needed
 
+    def draw_debug_rects(self, rect, margin_x=0.0, margin_y=0.0, safety_buffer=0.0):
+        """
+        Draw the base rect, the expanded rect (rect ± margin),
+        and the inset rect (after safety buffer).
+        """
+
+        x_min, y_min, x_max, y_max = rect
+
+        # Expand rect by margin
+        x_min_ext = x_min - margin_x
+        x_max_ext = x_max + margin_x
+        y_min_ext = y_min - margin_y
+        y_max_ext = y_max + margin_y
+
+        # Inset by safety buffer
+        x_min_in = x_min_ext + safety_buffer
+        x_max_in = x_max_ext - safety_buffer
+        y_min_in = y_min_ext + safety_buffer
+        y_max_in = y_max_ext - safety_buffer
+
+        # Convert to screen coords
+        def rect_to_screen(x0, y0, x1, y1):
+            p0 = self.map_to_screen(x0, y0)
+            p1 = self.map_to_screen(x1, y1)
+            return pygame.Rect(min(p0[0], p1[0]), min(p0[1], p1[1]),
+                               abs(p1[0] - p0[0]), abs(p1[1] - p0[1]))
+
+        base_rect = rect_to_screen(x_min, y_min, x_max, y_max)
+        ext_rect = rect_to_screen(x_min_ext, y_min_ext, x_max_ext, y_max_ext)
+        in_rect = rect_to_screen(x_min_in, y_min_in, x_max_in, y_max_in)
+
+        # Draw rectangles with different colors
+        pygame.draw.rect(self.screen, (0, 150, 0), base_rect,
+                         2)      # green: original rect
+        pygame.draw.rect(self.screen, (150, 150, 0), ext_rect,
+                         2)     # yellow: allowed outer rect
+        pygame.draw.rect(self.screen, (0, 0, 200), in_rect,
+                         2)        # blue: inset rect
+
     def map_to_screen(self, x, y):
         """Map local coordinates to screen coordinates using scale and offset."""
         sx = x * self.scale + self.offset[0]
@@ -220,12 +259,17 @@ class Drawer:
 
         # Step 2: Draw the target area (dark green rectangle)
         dark_green = (30, 70, 30)
-        # pygame.draw.rect(
-        #     self.screen,
-        #     dark_green,
-        #     self.world_rect,  # assuming self.target_area is a pygame.Rect
-        # )
-        self.screen.fill(dark_green)
+        pygame.draw.rect(
+            self.screen,
+            dark_green,
+            self.world_rect,  # assuming self.target_area is a pygame.Rect
+        )
+       # self.screen.fill(dark_green)
+
+        self.draw_debug_rects(cart.world_rect,
+                              margin_x=0.0,
+                              margin_y=0.0,
+                              safety_buffer=cart.specs.turn_radius + 0.2)
 
         # Step 3: Draw the job path, cart, etc.
         self.draw_job_path(job_path)

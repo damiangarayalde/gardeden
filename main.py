@@ -101,10 +101,12 @@ else:
 
 cart = Cart("configs/cart.yml")
 drawer = Drawer("configs/graphics.yml", cart)
-observer = Observer()
-observer.run_calibration()
+# observer = Observer()
+# observer.run_calibration()
 
-job_path = get_job_path(cart)
+job_path = get_job_path(
+    cart, margin_x=0.0, margin_y=0.0, safety_buffer=cart.specs.turn_radius + 0.2)
+
 cart.set_job_path(job_path)
 
 # Comms
@@ -156,6 +158,6 @@ while running:
     cart.run_controller()
 
     drawer.draw_scene(job_path, cart)
-    ar_frame = drawer.draw_augmented_reality(observer, job_path, cart)
+    # drawer.draw_augmented_reality(observer, job_path, cart)
 
 pygame.quit()

@@ -4,10 +4,10 @@ world:
 
 cart:
   # Fixed specs
-  rect: [0, 0, 0.3, 0.4]  # grande
+  rect: [0, 0, 0.4, 0.5]  # grande
   blade_pos: [0, 0]
-  blade_diameter: 0.3
-  distance_between_wheels: 0.4
+  blade_diameter: 0.35
+  distance_between_wheels: 0.45
   lateral_disturbance: 0.2
   angle_step: 0.02
   speed_step: 0.005

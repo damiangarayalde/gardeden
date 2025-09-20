@@ -53,7 +53,8 @@ class Cart:
         # Separate static and dynamic parts
         self.specs = CartSpecs(config["cart"])
         # x,y, angle in degrees
-        self.state = CartState(initial_pose=(0, 0, 0), config=config["cart"])
+        self.state = CartState(initial_pose=(
+            self.specs.blade_diameter/2, self.specs.blade_diameter/2, 0), config=config["cart"])
         self.world_rect = config["world"]["rect"]
 
         # Task/path-following parameters
