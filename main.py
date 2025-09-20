@@ -3,6 +3,7 @@ from lib.CartController import Cart
 from lib.draw import Drawer
 from lib.path import get_job_path
 from lib.CommModule import CommModule
+from lib.RealWorldObserver import Observer
 
 # ====== Network settings ======
 ESP32_IP = "192.168.0.16"
@@ -100,6 +101,8 @@ else:
 
 cart = Cart("configs/cart.yml")
 drawer = Drawer("configs/graphics.yml", cart)
+observer = Observer()
+observer.run_calibration()
 
 job_path = get_job_path(cart)
 cart.set_job_path(job_path)

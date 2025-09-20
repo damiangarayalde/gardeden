@@ -1,6 +1,6 @@
 world:
-  #rect: [0, 0, 12.7, 4.8]  # grande
-  rect: [0, 0, 3.7, 1.1]  # chico
+  rect: [0, 0, 12.7, 4.8]  # grande
+  #rect: [0, 0, 3.7, 1.1]  # chico
 
 cart:
   # Fixed specs
