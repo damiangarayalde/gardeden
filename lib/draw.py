@@ -95,12 +95,12 @@ class Drawer:
         in_rect = rect_to_screen(x_min_in, y_min_in, x_max_in, y_max_in)
 
         # Draw rectangles with different colors
-        pygame.draw.rect(self.screen, (0, 150, 0), base_rect,
-                         2)      # green: original rect
-        pygame.draw.rect(self.screen, (150, 150, 0), ext_rect,
-                         2)     # yellow: allowed outer rect
-        pygame.draw.rect(self.screen, (0, 0, 200), in_rect,
-                         2)        # blue: inset rect
+        pygame.draw.rect(self.screen, (30, 70, 30), base_rect,
+                         0)      # green: original rect
+        # pygame.draw.rect(self.screen, (150, 150, 0), ext_rect,
+        #                  2)     # yellow: allowed outer rect
+        # pygame.draw.rect(self.screen, (0, 0, 200), in_rect,
+        #                  2)        # blue: inset rect
 
     def map_to_screen(self, x, y):
         """Map local coordinates to screen coordinates using scale and offset."""
@@ -259,11 +259,11 @@ class Drawer:
 
         # Step 2: Draw the target area (dark green rectangle)
         dark_green = (30, 70, 30)
-        pygame.draw.rect(
-            self.screen,
-            dark_green,
-            self.world_rect,  # assuming self.target_area is a pygame.Rect
-        )
+        # pygame.draw.rect(
+        #     self.screen,
+        #     dark_green,
+        #     self.world_rect,  # assuming self.target_area is a pygame.Rect
+        # )
        # self.screen.fill(dark_green)
 
         self.draw_debug_rects(cart.world_rect,
