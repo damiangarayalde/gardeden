@@ -102,6 +102,7 @@ else:
 cart = Cart("configs/cart.yml")
 drawer = Drawer("configs/graphics.yml", cart)
 
+
 predefined_points = [[980, 1234], [880, 120], [1367, 102], [2145, 1001]]
 
 observer = Observer(predefined_points=predefined_points)

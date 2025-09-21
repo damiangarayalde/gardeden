@@ -1,4 +1,4 @@
 graphics:
-  width: 2304
-  height: 1296
+  width: 1024
+  height: 720
   fps: 60

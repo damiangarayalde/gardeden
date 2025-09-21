@@ -2,8 +2,6 @@ import pygame
 import math
 import yaml
 import time
-import cv2
-import numpy as np
 
 
 class Drawer:
@@ -22,7 +20,7 @@ class Drawer:
         self.offset = (0, 0)
         self.cart_image = None
         self.screen = pygame.display.set_mode(
-            self.window_size)  # (WIDTH, HEIGHT))
+            self.window_size, pygame.RESIZABLE)
 
         self.set_world_space(cart.world_rect)
 
