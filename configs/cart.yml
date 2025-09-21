@@ -10,7 +10,7 @@ cart:
   distance_between_wheels: 0.45
   lateral_disturbance: 0.2
   angle_step: 0.02
-  speed_step: 0.005
+  speed_step: 0.01
   turn_radius: 0.2
   overlap: 0.1
   paused_at_beginning: True

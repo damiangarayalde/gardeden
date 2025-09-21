@@ -101,8 +101,11 @@ else:
 
 cart = Cart("configs/cart.yml")
 drawer = Drawer("configs/graphics.yml", cart)
-observer = Observer()
-observer.run_calibration()
+
+predefined_points = [[980, 1234], [880, 120], [1367, 102], [2145, 1001]]
+
+observer = Observer(predefined_points=predefined_points)
+observer.run_calibration(drawer.screen)
 
 job_path = get_job_path(
     cart, margin_x=0.0, margin_y=0.0, safety_buffer=cart.specs.turn_radius + 0.2)
@@ -157,7 +160,7 @@ while running:
     #  //cart.updateMotors();
     cart.run_controller()
 
-    drawer.draw_scene(job_path, cart)
+    # drawer.draw_scene(job_path, cart)
     drawer.draw_augmented_reality(observer, job_path, cart)
 
 pygame.quit()

@@ -290,19 +290,23 @@ class Drawer:
 
     def draw_augmented_reality(self, observer, job_path, cart, alpha=0.8):
         """
-        Projects the rectangle, path, and cart over the real-world image
-        using the inverse homography. Returns an augmented reality frame.
+        Simulates augmented reality by drawing cart + paths projected into
+        the observer’s camera space, but rendered with pygame only.
         """
 
-        # Step 1: Get a fresh copy of the observer's frame
-        frame = observer.get_augmented_frame()
+        # Get camera frame as pygame surface if available
+        frame_surface = observer.get_augmented_surface()
+
+        # Blit frame first (camera image)
+        if frame_surface:
+            frame_surface.set_alpha(int(alpha * 255))
+            self.screen.blit(frame_surface, (0, 0))
 
         # Step 2: Draw job path in image space
         if job_path and len(job_path) > 1:
             path_pixels = [observer.world_to_image(
                 (x, y)) for x, y, *_ in job_path]
-            cv2.polylines(frame, [np.int32(path_pixels)],
-                          False, (255, 0, 0), 2)
+            pygame.draw.lines(self.screen, (0, 0, 255), False, path_pixels, 2)
 
         # Step 3: Draw walked path (blade coverage)
         walked_path = cart.get_walked_path()
@@ -310,49 +314,61 @@ class Drawer:
             # Convert diameter to radius and scale up
             blade_radius = int(cart.get_blade_diameter() * 10 / 2)
 
+            # -----
             # Draw the entire path as a filled area (similar to the job path visualization)
-            path_points = []
-            for x, y in walked_path:
-                px, py = observer.world_to_image((x, y))
-                path_points.append((px, py))
+            path_pixels = [observer.world_to_image(
+                (x, y)) for x, y in walked_path]
 
-            # Create a polygon that represents the blade coverage area
-            if len(path_points) > 1:
-                # Create offset points for the polygon (to represent blade width)
-                polygon_points = []
+            for px, py in path_pixels:
+                pygame.draw.circle(self.screen, (0, 200, 0),
+                                   (int(px), int(py)), blade_radius)
 
-                # Calculate perpendicular vectors for each segment
-                for i in range(len(path_points) - 1):
-                    x1, y1 = path_points[i]
-                    x2, y2 = path_points[i + 1]
+            # old code
+            # path_points = []
+            # for x, y in walked_path:
+            #     px, py = observer.world_to_image((x, y))
+            #     path_points.append((px, py))
 
-                    # Calculate perpendicular vector
-                    dx = x2 - x1
-                    dy = y2 - y1
-                    # Avoid division by zero
-                    length = max(0.1, math.sqrt(dx*dx + dy*dy))
+            # # Create a polygon that represents the blade coverage area
+            # if len(path_points) > 1:
+            #     # Create offset points for the polygon (to represent blade width)
+            #     polygon_points = []
 
-                    # Normalize and get perpendicular
-                    nx = -dy / length * blade_radius
-                    ny = dx / length * blade_radius
+            #     # Calculate perpendicular vectors for each segment
+            #     for i in range(len(path_points) - 1):
+            #         x1, y1 = path_points[i]
+            #         x2, y2 = path_points[i + 1]
 
-                    # Add points on both sides of the path
-                    if i == 0:
-                        polygon_points.append((x1 + nx, y1 + ny))
-                        polygon_points.insert(0, (x1 - nx, y1 - ny))
+            #         # Calculate perpendicular vector
+            #         dx = x2 - x1
+            #         dy = y2 - y1
+            #         # Avoid division by zero
+            #         length = max(0.1, math.sqrt(dx*dx + dy*dy))
 
-                    polygon_points.append((x2 + nx, y2 + ny))
-                    polygon_points.insert(0, (x2 - nx, y2 - ny))
+            #         # Normalize and get perpendicular
+            #         nx = -dy / length * blade_radius
+            #         ny = dx / length * blade_radius
 
-                # Draw the filled polygon representing blade coverage
-                if len(polygon_points) > 2:
-                    cv2.fillPoly(
-                        frame, [np.array(polygon_points, np.int32)], (0, 200, 0))
+            #         # Add points on both sides of the path
+            #         if i == 0:
+            #             polygon_points.append((x1 + nx, y1 + ny))
+            #             polygon_points.insert(0, (x1 - nx, y1 - ny))
 
-                # Also draw the center line for better visibility
-                for i in range(len(path_points) - 1):
-                    cv2.line(frame, path_points[i],
-                             path_points[i+1], (0, 150, 0), 2)
+            #         polygon_points.append((x2 + nx, y2 + ny))
+            #         polygon_points.insert(0, (x2 - nx, y2 - ny))
+
+            #     # Draw the filled polygon representing blade coverage
+            #     if len(polygon_points) > 2:
+            #         cv2.fillPoly(
+            #             frame, [np.array(polygon_points, np.int32)], (0, 200, 0))
+
+            #     # Also draw the center line for better visibility
+            #     for i in range(len(path_points) - 1):
+            #         cv2.line(frame, path_points[i],
+            #                  path_points[i+1], (0, 150, 0), 2)
+            # -----
+
+            pygame.draw.lines(self.screen, (0, 150, 0), False, path_pixels, 2)
 
         # Step 4: Draw cart (as polygon projected with homography)
         x, y, heading = cart.get_pose()
@@ -367,7 +383,7 @@ class Drawer:
             body_world.append((bx, by))
 
         body_img = [observer.world_to_image(pt) for pt in body_world]
-        cv2.polylines(frame, [np.int32(body_img)], True, (0, 100, 200), 0)
+        pygame.draw.polygon(self.screen, (0, 100, 200), body_img, 0)
 
         # Draw heading line
         tip_length = half
@@ -375,11 +391,7 @@ class Drawer:
         tip_y = y + tip_length * math.sin(heading_rad)
         p1 = observer.world_to_image((x, y))
         p2 = observer.world_to_image((tip_x, tip_y))
-        cv2.line(frame, p1, p2, (0, 0, 255), 2)
+        pygame.draw.line(self.screen, (255, 0, 0), p1, p2, 2)
 
-        # Step 5: Blend augmented layer with real frame
-        blended = cv2.addWeighted(observer.frame, 1 - alpha, frame, alpha, 0)
-
-        cv2.imshow("Augmented Reality", blended)
-
-        return blended
+        # Update window
+        pygame.display.flip()
