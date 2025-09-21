@@ -21,13 +21,6 @@ class Observer:
             [0, 12.7],     # top-left
             [4.8, 12.7],   # top-right
             [4.8, 0]     # bottom-right
-
-
-
-            # [0, 0],       # top-left
-            # [4.8, 0],     # top-right
-            # [4.8, 12.7],   # bottom-right
-            # [0, 12.7]      # bottom-left
         ], dtype=np.float32)
 
         self.clicked_points = []
@@ -36,8 +29,7 @@ class Observer:
         self.calibrated = False
 
         # Load a snapshot (replace with camera frame if needed)
-        # f = cv2.imread("snapshot.jpg")
-        self.frame = cv2.imread("snapshot.jpg")  # f.copy()
+        self.frame = cv2.imread("snapshot.jpg")
 
         cv2.namedWindow("Calibration")
         cv2.setMouseCallback("Calibration", self.mouse_callback, self.frame)

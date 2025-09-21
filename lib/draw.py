@@ -288,7 +288,7 @@ class Drawer:
         # Finally update the display
         pygame.display.flip()
 
-    def draw_augmented_reality(self, observer, job_path, cart, alpha=0.5):
+    def draw_augmented_reality(self, observer, job_path, cart, alpha=0.8):
         """
         Projects the rectangle, path, and cart over the real-world image
         using the inverse homography. Returns an augmented reality frame.
@@ -307,11 +307,52 @@ class Drawer:
         # Step 3: Draw walked path (blade coverage)
         walked_path = cart.get_walked_path()
         if walked_path and len(walked_path) > 1:
-            blade_radius = int(cart.get_blade_diameter() *
-                               10)  # scale up for visibility
+            # Convert diameter to radius and scale up
+            blade_radius = int(cart.get_blade_diameter() * 10 / 2)
+
+            # Draw the entire path as a filled area (similar to the job path visualization)
+            path_points = []
             for x, y in walked_path:
                 px, py = observer.world_to_image((x, y))
-                cv2.circle(frame, (px, py), blade_radius, (0, 200, 0), -1)
+                path_points.append((px, py))
+
+            # Create a polygon that represents the blade coverage area
+            if len(path_points) > 1:
+                # Create offset points for the polygon (to represent blade width)
+                polygon_points = []
+
+                # Calculate perpendicular vectors for each segment
+                for i in range(len(path_points) - 1):
+                    x1, y1 = path_points[i]
+                    x2, y2 = path_points[i + 1]
+
+                    # Calculate perpendicular vector
+                    dx = x2 - x1
+                    dy = y2 - y1
+                    # Avoid division by zero
+                    length = max(0.1, math.sqrt(dx*dx + dy*dy))
+
+                    # Normalize and get perpendicular
+                    nx = -dy / length * blade_radius
+                    ny = dx / length * blade_radius
+
+                    # Add points on both sides of the path
+                    if i == 0:
+                        polygon_points.append((x1 + nx, y1 + ny))
+                        polygon_points.insert(0, (x1 - nx, y1 - ny))
+
+                    polygon_points.append((x2 + nx, y2 + ny))
+                    polygon_points.insert(0, (x2 - nx, y2 - ny))
+
+                # Draw the filled polygon representing blade coverage
+                if len(polygon_points) > 2:
+                    cv2.fillPoly(
+                        frame, [np.array(polygon_points, np.int32)], (0, 200, 0))
+
+                # Also draw the center line for better visibility
+                for i in range(len(path_points) - 1):
+                    cv2.line(frame, path_points[i],
+                             path_points[i+1], (0, 150, 0), 2)
 
         # Step 4: Draw cart (as polygon projected with homography)
         x, y, heading = cart.get_pose()
@@ -326,7 +367,7 @@ class Drawer:
             body_world.append((bx, by))
 
         body_img = [observer.world_to_image(pt) for pt in body_world]
-        cv2.polylines(frame, [np.int32(body_img)], True, (0, 100, 200), 2)
+        cv2.polylines(frame, [np.int32(body_img)], True, (0, 100, 200), 0)
 
         # Draw heading line
         tip_length = half
