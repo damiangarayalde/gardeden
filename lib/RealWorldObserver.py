@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 import yaml
 import pygame
 
@@ -21,14 +22,21 @@ class Observer:
         self.mask = None
         self.calibrated = False
 
-        # Load a snapshot (replace with camera frame if needed)
-        try:
-            self.frame_surface = pygame.image.load(snapshot_path).convert()
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Could not load image at {snapshot_path}")
+        # Load snapshot
+        self.frame = cv2.imread(snapshot_path)
+        if self.frame is None:
+            raise FileNotFoundError(
+                f"Could not load snapshot at {snapshot_path}")
+
+        # Convert BGR → RGB and to pygame surface
+        frame_rgb = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
+        h, w, _ = frame_rgb.shape
+        self.frame_size = (w, h)
+        self.background_surface = pygame.image.frombuffer(
+            frame_rgb.tobytes(), (w, h), "RGB")
 
         # Convert to pixel array for math if needed
-        self.frame_size = self.frame_surface.get_size()
+        self.frame_size = self.background_surface.get_size()
 
         if predefined_points is not None:
             if len(predefined_points) == 4:
@@ -40,7 +48,7 @@ class Observer:
     def calibrate_with_points(self):
         """Calibrate using predefined 4 image points → world coords."""
         pts_image = np.array(self.clicked_points, dtype=np.float32)
-        self.H, self.mask = find_homography(pts_image, self.pts_world)
+        self.H, self.mask = cv2.findHomography(pts_image, self.pts_world)
         self.calibrated = True
         print("Calibration complete using predefined points!")
 
@@ -68,9 +76,15 @@ class Observer:
     # -------------------------------------------------------------------------
     # Frame accessor
     # -------------------------------------------------------------------------
-    def get_augmented_surface(self):
-        """Return a fresh pygame.Surface copy of the frame for drawing AR overlays."""
-        return self.frame_surface.copy()
+    def get_background_surface(self, size=None):
+        """
+        Return a pygame.Surface of the latest camera snapshot.
+        If size is provided, return a resized copy.
+        """
+        surface = self.background_surface.copy()
+        if size is not None:
+            surface = pygame.transform.smoothscale(surface, size)
+        return surface
 
     # -------------------------------------------------------------------------
     # Calibration with mouse clicks
@@ -90,16 +104,21 @@ class Observer:
                 if event.type == pygame.QUIT:
                     running = False
 
-                elif event.type == pygame.VIDEORESIZE:
-                    # Recreate resizable window with new size
-                    screen = pygame.display.set_mode(
-                        (event.w, event.h), pygame.RESIZABLE)
+                # elif event.type == pygame.VIDEORESIZE:
+                #     # Recreate resizable window with new size
+                #     screen = pygame.display.set_mode(
+                #         (event.w, event.h), pygame.RESIZABLE)
 
                 elif event.type == pygame.MOUSEBUTTONDOWN and not self.calibrated:
                     if len(self.clicked_points) < 4:
-                        self.clicked_points.append(event.pos)
+                        # Convert from SCREEN coords → IMAGE coords
+                        screen_w, screen_h = screen.get_size()
+                        img_w, img_h = self.frame_size
+                        x_img = int(event.pos[0] * img_w / screen_w)
+                        y_img = int(event.pos[1] * img_h / screen_h)
+                        self.clicked_points.append((x_img, y_img))
                         print(
-                            f"Calibration point {len(self.clicked_points)}: {event.pos}")
+                            f"Calibration point {len(self.clicked_points)} (image coords): {(x_img, y_img)}")
 
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN and len(self.clicked_points) == 4:
@@ -110,44 +129,20 @@ class Observer:
             # Get current screen size
             screen_w, screen_h = screen.get_size()
 
-            # Scale the snapshot to fit the screen size
+            # Scale background to fit window
             scaled_surface = pygame.transform.smoothscale(
-                self.frame_surface, (screen_w, screen_h))
-
-            # Draw scaled snapshot
+                self.background_surface, (screen_w, screen_h))
             screen.blit(scaled_surface, (0, 0))
 
-            # Draw calibration points
-            for i, pt in enumerate(self.clicked_points):
-                pygame.draw.circle(screen, (255, 0, 0), pt, 5)
+            # Draw calibration points (map image coords → screen coords)
+            for i, pt_img in enumerate(self.clicked_points):
+                x_scr = int(pt_img[0] * screen_w / self.frame_size[0])
+                y_scr = int(pt_img[1] * screen_h / self.frame_size[1])
+                pygame.draw.circle(screen, (255, 0, 0), (x_scr, y_scr), 5)
+
                 if i < len(self.pts_world):
                     rw = self.pts_world[i]
                     txt = font.render(f"{rw[0]},{rw[1]}", True, (0, 255, 0))
-                    screen.blit(txt, (pt[0] + 10, pt[1]))
+                    screen.blit(txt, (x_scr + 10, y_scr))
 
             pygame.display.flip()
-
-
-# -------------------------------------------------------------------------
-# Replacement for cv2.findHomography (DLT method, numpy only)
-# -------------------------------------------------------------------------
-def find_homography(src_pts, dst_pts):
-    """
-    Minimal replacement for cv2.findHomography using Direct Linear Transform (DLT).
-    src_pts, dst_pts: Nx2 arrays
-    Returns: H (3x3), mask
-    """
-    if src_pts.shape[0] < 4:
-        raise ValueError("At least 4 points required")
-
-    A = []
-    for (x, y), (X, Y) in zip(src_pts, dst_pts):
-        A.append([-x, -y, -1, 0, 0, 0, x*X, y*X, X])
-        A.append([0, 0, 0, -x, -y, -1, x*Y, y*Y, Y])
-    A = np.array(A)
-
-    # Solve using SVD
-    _, _, Vt = np.linalg.svd(A)
-    H = Vt[-1].reshape(3, 3)
-    H /= H[2, 2]
-    return H, None
