@@ -106,30 +106,49 @@ class Drawer:
         sy = y * self.scale + self.offset[1]
         return sx, sy
 
-    def draw_cart(self, cart_pose, cart_rear_lights=False, cart_tracking_enabled=False, cart_horn_active=True):
+    def draw_cart(self, cart_pose, cart_rear_lights=False, cart_tracking_enabled=False, cart_horn_active=True, mode="zenital", observer=None):
         """
         Draws a cart at (x, y, heading) with given wheel angle.
-        The cart is a square with a central circle and 4 wheels (rectangles).
-        Front wheels rotate to indicate steering.
-        """
-        x, y, heading = cart_pose
+        Supports both zenital (top-down) and camera (projected) modes.
 
-        # Map cart position to screen
-        x, y = self.map_to_screen(x, y)
+        Args:
+            cart_pose: (x, y, heading) world coordinates
+            cart_rear_lights: whether rear lights are active
+            cart_tracking_enabled: whether tracking cone is visible
+            cart_horn_active: whether horn/blade is active
+            mode (str): "zenital" (top-down view) or "camera" (projected on snapshot)
+            observer (Observer): required if mode="camera"
+        """
+        if mode == "camera" and observer is None:
+            raise ValueError("observer is required for camera projection mode")
+
+        x, y, heading = cart_pose
         heading_rad = math.radians(heading)
-        cart_size = self.cart_size * self.scale
+        cart_size = 0.5  # self.cart_size * self.scale
+
+        half = cart_size / 2
+        print(
+            f"cart_size:{self.cart_size}, scale: {self.scale} \t half: {half}  \n")
+
+        # --- Helper function to convert world coordinates to screen/image coordinates ---
+        def world_to_display(pt):
+            if mode == "zenital":
+                return self.map_to_screen(pt[0], pt[1])
+            else:  # camera mode
+                return observer.world_to_image(pt)
 
         # --- Draw cart body (square) ---
-        half = cart_size / 2
-        body_corners = []
+        body_corners_world = []
         for dx, dy in [(-half, -half), (half, -half), (half, half), (-half, half)]:
             bx = x + dx * math.cos(heading_rad) - dy * math.sin(heading_rad)
             by = y + dx * math.sin(heading_rad) + dy * math.cos(heading_rad)
-            body_corners.append((bx, by))
-        pygame.draw.polygon(self.screen, (0, 100, 200), body_corners)
+            body_corners_world.append((bx, by))
+
+        body_corners_display = [world_to_display(
+            pt) for pt in body_corners_world]
+        pygame.draw.polygon(self.screen, (0, 100, 200), body_corners_display)
 
         # --- Draw central circle (blade) ---
-
         if cart_horn_active:
             circle_color = (100, 100, 210)
         else:
@@ -139,18 +158,20 @@ class Drawer:
             heading_rad) - self.blade_pos[1] * self.scale * math.sin(heading_rad)
         blade_y = y + self.blade_pos[0] * self.scale * math.sin(
             heading_rad) + self.blade_pos[1] * self.scale * math.cos(heading_rad)
-        pygame.draw.circle(self.screen, circle_color, (int(blade_x), int(
-            blade_y)), int(self.blade_diameter * self.scale // 2))
+        blade_center_display = world_to_display((blade_x, blade_y))
+        pygame.draw.circle(self.screen, circle_color, blade_center_display, int(
+            self.blade_diameter * self.scale // 2))
 
         # --- Draw heading indicator (small line from center) ---
         tip_length = cart_size // 2
         tip_x = x + tip_length * math.cos(heading_rad)
         tip_y = y + tip_length * math.sin(heading_rad)
-        pygame.draw.line(self.screen, (255, 0, 0), (x, y), (tip_x, tip_y), 3)
+        center_display = world_to_display((x, y))
+        tip_display = world_to_display((tip_x, tip_y))
+        pygame.draw.line(self.screen, (255, 0, 0),
+                         center_display, tip_display, 3)
 
         # --- Draw rear lights ---
-
-        rear_x = -half  # back face along -X
         light_w = cart_size * 0.07
         light_h = cart_size * 0.15
         side_offset = cart_size * 0.25  # push along Y (up/down from center)
@@ -164,10 +185,10 @@ class Drawer:
         standby_color = (60, 30, 10)  # very dim amber
 
         for side in [-1, 1]:  # bottom (-1), top (+1) relative to cart
-            dx_local = rear_x
+            dx_local = -half  # back face along -X
             dy_local = side * side_offset
 
-            # Rotate into world space
+            # Calculate light center in world coordinates
             cx = x + dx_local * math.cos(heading_rad) - \
                 dy_local * math.sin(heading_rad)
             cy = y + dx_local * math.sin(heading_rad) + \
@@ -179,8 +200,8 @@ class Drawer:
             else:
                 color = standby_color
 
-            # Compute rectangle corners for each light (so it rotates with heading)
-            rect_corners = []
+            # Compute rectangle corners for each light in world coordinates
+            rect_corners_world = []
             for ldx, ldy in [(-light_w/2, -light_h/2),
                              (light_w/2, -light_h/2),
                              (light_w/2,  light_h/2),
@@ -189,21 +210,29 @@ class Drawer:
                     ldy * math.sin(heading_rad)
                 ly = cy + ldx * math.sin(heading_rad) + \
                     ldy * math.cos(heading_rad)
-                rect_corners.append((lx, ly))
+                rect_corners_world.append((lx, ly))
 
-            pygame.draw.polygon(self.screen, color, rect_corners)
+            # Convert to display coordinates and draw
+            rect_corners_display = [world_to_display(
+                pt) for pt in rect_corners_world]
+            pygame.draw.polygon(self.screen, color, rect_corners_display)
 
         # --- Draw forward tracking cone ---
         if cart_tracking_enabled:
             cone_length = half
             cone_angle = math.radians(10)
             angles = [heading_rad - cone_angle, heading_rad + cone_angle]
-            cone_points = [(x, y)]
+
+            cone_points_world = [(x, y)]
             for a in angles:
                 px = x + cone_length * math.cos(a)
                 py = y + cone_length * math.sin(a)
-                cone_points.append((px, py))
-            pygame.draw.polygon(self.screen, (255, 0, 0), cone_points, 0)
+                cone_points_world.append((px, py))
+
+            cone_points_display = [world_to_display(
+                pt) for pt in cone_points_world]
+            pygame.draw.polygon(self.screen, (255, 0, 0),
+                                cone_points_display, 0)
 
     def draw_job_path(self, job_path, mode="zenital", observer=None):
         """
@@ -252,17 +281,40 @@ class Drawer:
             # Slightly offset to avoid overlap
             self.screen.blit(text, (sx + 5, sy - 15))
 
-    def draw_walked_path(self, walked_path, blade_diameter):
-        """Draw the walked path and blade area as a green line and shaded area."""
-        if len(walked_path) > 1:
-            walked_path_screen = [self.map_to_screen(
-                x, y) for x, y in walked_path]
+    def draw_walked_path(self, walked_path, blade_diameter, mode="zenital", observer=None):
+        """
+        Draw the walked path and blade area as a green line and shaded area.
+
+        Args:
+            walked_path (list): list of (x, y) world points
+            blade_diameter (float): diameter of the blade for coverage area
+            mode (str): "zenital" (top-down view) or "camera" (projected on snapshot)
+            observer (Observer): required if mode="camera"
+        """
+        if mode == "camera" and observer is None:
+            raise ValueError("observer is required for camera projection mode")
+
+        if not walked_path or len(walked_path) < 2:
+            return
+
+        # --- Convert path points to screen/image coordinates ---
+        if mode == "zenital":
+            path_points = [self.map_to_screen(x, y) for x, y in walked_path]
+            # For zenital mode, scale the blade radius with the view scale
             blade_radius = int(blade_diameter * self.scale // 2)
-            for pos in walked_path_screen:
-                pygame.draw.circle(self.screen, (50, 120, 50),
-                                   (int(pos[0]), int(pos[1])), blade_radius)
-            pygame.draw.lines(self.screen, (0, 150, 0), False,
-                              walked_path_screen, 2)
+        else:  # camera mode
+            path_points = [observer.world_to_image(
+                (x, y)) for x, y in walked_path]
+            # For camera mode, use fixed scaling (as in the original camera code)
+            blade_radius = int(blade_diameter * 10 / 2)
+
+        # --- Draw blade coverage area ---
+        for pos in path_points:
+            pygame.draw.circle(self.screen, (50, 120, 50),
+                               (int(pos[0]), int(pos[1])), blade_radius)
+
+        # --- Draw path line ---
+        pygame.draw.lines(self.screen, (0, 150, 0), False, path_points, 2)
 
     def draw_scene(self, job_path, cart):
         """
@@ -287,8 +339,8 @@ class Drawer:
                               margin_y=0.0,
                               safety_buffer=cart.specs.turn_radius + 0.2)
 
-        # Step 3: Draw the job path, cart, etc.
         self.draw_job_path(job_path, mode='zenital')
+
         self.draw_walked_path(
             cart.get_walked_path(),
             blade_diameter=cart.get_blade_diameter()
@@ -322,47 +374,20 @@ class Drawer:
         # 3. Draw the background
         self.screen.blit(background, (0, 0))
 
-        # Draw job path in image space
         self.draw_job_path(job_path, mode="camera", observer=observer)
 
-        # Step 3: Draw walked path (blade coverage)
-        walked_path = cart.get_walked_path()
-        if walked_path and len(walked_path) > 1:
-            # Convert diameter to radius and scale up
-            blade_radius = int(cart.get_blade_diameter() * 10 / 2)
+        self.draw_walked_path(walked_path=cart.state.walked_path,
+                              blade_diameter=cart.specs.blade_diameter,
+                              mode="camera",
+                              observer=observer)
 
-            # Draw the entire path as a filled area (similar to the job path visualization)
-            path_pixels = [observer.world_to_image(
-                (x, y)) for x, y in walked_path]
-
-            for px, py in path_pixels:
-                pygame.draw.circle(self.screen, (0, 200, 0),
-                                   (int(px), int(py)), blade_radius)
-
-            pygame.draw.lines(self.screen, (0, 150, 0), False, path_pixels, 2)
-
-        # Step 4: Draw cart (as polygon projected with homography)
-        x, y, heading = cart.get_pose()
-        half = self.cart_size / 2
-        heading_rad = math.radians(heading)
-
-        # Cart body corners in world coords
-        body_world = []
-        for dx, dy in [(-half, -half), (half, -half), (half, half), (-half, half)]:
-            bx = x + dx * math.cos(heading_rad) - dy * math.sin(heading_rad)
-            by = y + dx * math.sin(heading_rad) + dy * math.cos(heading_rad)
-            body_world.append((bx, by))
-
-        body_img = [observer.world_to_image(pt) for pt in body_world]
-        pygame.draw.polygon(self.screen, (0, 100, 200), body_img, 0)
-
-        # Draw heading line
-        tip_length = half
-        tip_x = x + tip_length * math.cos(heading_rad)
-        tip_y = y + tip_length * math.sin(heading_rad)
-        p1 = observer.world_to_image((x, y))
-        p2 = observer.world_to_image((tip_x, tip_y))
-        pygame.draw.line(self.screen, (255, 0, 0), p1, p2, 2)
+        self.draw_cart(
+            cart_pose=cart.get_pose(),
+            cart_rear_lights=cart.state.paused,
+            cart_tracking_enabled=cart.state.tracking_enabled,
+            cart_horn_active=cart.state.horn,
+            mode="camera", observer=observer
+        )
 
         # Update window
         pygame.display.flip()
