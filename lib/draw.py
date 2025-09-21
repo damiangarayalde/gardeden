@@ -205,34 +205,52 @@ class Drawer:
                 cone_points.append((px, py))
             pygame.draw.polygon(self.screen, (255, 0, 0), cone_points, 0)
 
-    def draw_job_path(self, job_path):
-        """Draw the job path as a blue line, with labels at start, mid, end."""
-        if job_path and len(job_path) > 1:
-            job_path_screen = [self.map_to_screen(
-                x, y) for x, y, *_ in job_path]
+    def draw_job_path(self, job_path, mode="zenital", observer=None):
+        """
+        Draw the job path with labels at start, mid, and end.
 
-            # Draw the path
-            pygame.draw.lines(self.screen, (100, 100, 200),
-                              False, job_path_screen, 2)
+        Args:
+            job_path (list): list of (x, y, ...) world points
+            mode (str): "zenital" (top-down view) or "camera" (projected on snapshot)
+            observer (Observer): required if mode="camera"
+        """
+        if not job_path or len(job_path) < 2:
+            return
 
-            # Create font
-            font = pygame.font.SysFont("Arial", 14)
+        # --- Map world path to screen/image coordinates ---
+        if mode == "zenital":
+            path_points = [self.map_to_screen(x, y) for x, y, *_ in job_path]
 
-            # --- Pick positions: start, mid, end ---
-            start_idx = 0
-            mid_idx = len(job_path) // 2
-            end_idx = len(job_path) - 1
+        elif mode == "camera":
+            if observer is None:
+                raise ValueError(
+                    "observer is required for camera projection mode")
+            path_points = [observer.world_to_image(
+                (x, y)) for x, y, *_ in job_path]
 
-            for idx, label in zip([start_idx, mid_idx, end_idx], ["Start", "Mid", "End"]):
-                x, y, *_ = job_path[idx]
-                sx, sy = job_path_screen[idx]
+        else:
+            raise ValueError("mode must be 'zenital' or 'camera'")
 
-                # Render text with coordinates (3 decimals)
-                text = font.render(
-                    f"{label}: [ {x:.1f}, {y:.1f}]", True, (100, 100, 200))
+        # --- Draw path ---
+        color = (0, 0, 255) if mode == "camera" else (100, 100, 200)
+        pygame.draw.lines(self.screen, color, False, path_points, 2)
 
-                # Draw text slightly offset so it doesn't overlap the line
-                self.screen.blit(text, (sx + 5, sy - 15))
+        # --- Create font ---
+        font = pygame.font.SysFont("Arial", 14)
+
+        # --- Pick start, mid, end ---
+        start_idx, mid_idx, end_idx = 0, len(job_path) // 2, len(job_path) - 1
+        labels = [("Start", start_idx), ("Mid", mid_idx), ("End", end_idx)]
+
+        for label, idx in labels:
+            x, y, *_ = job_path[idx]
+            sx, sy = path_points[idx]
+
+            # Render text (x,y rounded)
+            text = font.render(f"{label}: [ {x:.1f}, {y:.1f}]", True, color)
+
+            # Slightly offset to avoid overlap
+            self.screen.blit(text, (sx + 5, sy - 15))
 
     def draw_walked_path(self, walked_path, blade_diameter):
         """Draw the walked path and blade area as a green line and shaded area."""
@@ -270,7 +288,7 @@ class Drawer:
                               safety_buffer=cart.specs.turn_radius + 0.2)
 
         # Step 3: Draw the job path, cart, etc.
-        self.draw_job_path(job_path)
+        self.draw_job_path(job_path, mode='zenital')
         self.draw_walked_path(
             cart.get_walked_path(),
             blade_diameter=cart.get_blade_diameter()
@@ -304,11 +322,8 @@ class Drawer:
         # 3. Draw the background
         self.screen.blit(background, (0, 0))
 
-        # Step 2: Draw job path in image space
-        if job_path and len(job_path) > 1:
-            path_pixels = [observer.world_to_image(
-                (x, y)) for x, y, *_ in job_path]
-            pygame.draw.lines(self.screen, (0, 0, 255), False, path_pixels, 2)
+        # Draw job path in image space
+        self.draw_job_path(job_path, mode="camera", observer=observer)
 
         # Step 3: Draw walked path (blade coverage)
         walked_path = cart.get_walked_path()
