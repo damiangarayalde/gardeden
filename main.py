@@ -162,6 +162,6 @@ while running:
     cart.run_controller()
 
     # drawer.draw_scene(job_path, cart)
-    drawer.draw_scene_overlay(observer, job_path, cart)
+    drawer.draw_scene(job_path, cart, mode="camera", observer=observer)
 
 pygame.quit()
