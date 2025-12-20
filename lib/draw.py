@@ -149,7 +149,7 @@ class Drawer:
         pygame.draw.polygon(self.screen, (0, 100, 200), body_corners_display)
 
         # --- Blade circle ---
-        circle_color = (100, 100, 210) if cart_horn_active else (120, 120, 250)
+        circle_color = (100, 210, 210) if cart_horn_active else (120, 220, 250)
         blade_x = x + \
             self.blade_pos[0] * math.cos(heading_rad) - \
             self.blade_pos[1] * math.sin(heading_rad)
@@ -158,7 +158,7 @@ class Drawer:
             self.blade_pos[1] * math.cos(heading_rad)
         blade_center_display = world_to_display((blade_x, blade_y))
         pygame.draw.circle(self.screen, circle_color, blade_center_display, int(
-            self.blade_diameter * self.scale // 2))
+            self.blade_diameter * self.scale // 4))
 
         # --- Heading indicator ---
         tip_length = cart_size / 2
@@ -252,8 +252,14 @@ class Drawer:
             raise ValueError("mode must be 'zenital' or 'camera'")
 
         # --- Draw path ---
-        color = (0, 0, 255) if mode == "camera" else (100, 100, 200)
-        pygame.draw.lines(self.screen, color, False, path_points, 2)
+
+        color = (100, 100, 255, 128) if mode == "camera" else (
+            100, 100, 255, 128)
+
+        # draw on an SRCALPHA surface then blit to preserve translucency
+        overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
+        pygame.draw.lines(overlay, color, False, path_points, 2)
+        self.screen.blit(overlay, (0, 0))
 
         # --- Create font ---
         font = pygame.font.SysFont("Arial", 14)
@@ -266,7 +272,10 @@ class Drawer:
             x, y, *_ = job_path[idx]
             sx, sy = path_points[idx]
 
-            text = font.render(f"{label}: [ {x:.1f}, {y:.1f}]", True, color)
+            msg = f"{label}"                            # Option A:   End
+            # msg = f"{label}: [ {x:.1f}, {y:.1f}]"     # Option B:   End: [2.1, 12.2]
+
+            text = font.render(msg, True, color)
             self.screen.blit(text, (sx + 5, sy - 15))
 
     def draw_walked_path(self, walked_path, blade_diameter,
@@ -309,26 +318,47 @@ class Drawer:
             img_w, img_h = observer.frame_size
             screen_w, screen_h = self.screen.get_size()
             scale_factor = (screen_w / img_w + screen_h / img_h) / 2
-            blade_radius = int((blade_diameter * scale_factor) // 2)
+            blade_radius = 25  # fallback value
 
-        # --- Draw blade coverage area ---
+        # --- Draw on transparent overlay to get 50% translucency ---
+        overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
+
+        # semi-transparent colors (RGBA)
+        coverage_color = (50, 120, 50, 128)  # 50% alpha
+        line_color = (0, 150, 0, 128)       # 50% alpha
+
+        # Draw blade coverage circles onto overlay
         for pos in path_points:
-            print(blade_radius)
-            pygame.draw.circle(self.screen, (50, 120, 50),
+            pygame.draw.circle(overlay, coverage_color,
                                (int(pos[0]), int(pos[1])), blade_radius)
 
-        # --- Draw path line ---
-        pygame.draw.lines(self.screen, (0, 150, 0), False, path_points, 2)
+        # Draw walked path line onto overlay
+        if len(path_points) > 1:
+            pygame.draw.lines(overlay, line_color, False, path_points, 2)
+
+        # Blit overlay onto main screen
+        self.screen.blit(overlay, (0, 0))
+
+    def dim_background(self, alpha=128, color=(0, 0, 0)):
+        """Draw a translucent overlay over the current screen to dim the background.
+        alpha: 0..255 (128 ≈ 50% dim)
+        """
+        overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((color[0], color[1], color[2], alpha))
+        self.screen.blit(overlay, (0, 0))
 
     def _draw_zenital_view(self, job_path, cart):
         """Helper method to draw the zenital view"""
-        # Draw debug rectangles
+        # Draw debug rectangles (background/field)
         self.draw_debug_rects(
             cart.world_rect,
             margin_x=0.0,
             margin_y=0.0,
             safety_buffer=cart.specs.turn_radius + 0.2
         )
+
+        # Dim background so job/walked paths and cart stand out
+        self.dim_background(alpha=128)
 
         # Draw job path
         self.draw_job_path(job_path, mode='zenital')
@@ -359,6 +389,9 @@ class Drawer:
 
         # Draw the background
         self.screen.blit(background, (0, 0))
+
+        # Dim the background so overlays are clearer
+        self.dim_background(alpha=128)
 
         # Draw job path
         self.draw_job_path(job_path, mode="camera", observer=observer)
