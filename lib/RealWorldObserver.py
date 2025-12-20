@@ -12,10 +12,16 @@ class Observer:
         # Adjust units (cm, m, etc.)
         self.pts_world = np.array([
             [0, 0],    # bottom-left
-            [12.7, 0],  # top-left
-            [12.7, 4.8],  # top-right
-            [0, 4.8]  # bottom-right
+            [3.5, 0],  # top-left
+            [3.5, 2.1],  # top-right
+            [0, 2.1]  # bottom-right
         ], dtype=np.float32)
+        # self.pts_world = np.array([
+        #     [0, 0],    # bottom-left
+        #     [12.7, 0],  # top-left
+        #     [12.7, 4.8],  # top-right
+        #     [0, 4.8]  # bottom-right
+        # ], dtype=np.float32)
 
         self.clicked_points = []
         self.H = None
