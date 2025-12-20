@@ -17,8 +17,8 @@ JS_BTN_L1 = 10
 JS_BTN_R1 = 9
 JS_BTN_SQUARE = 2
 JS_AXIS_LEFT_HORIZONTAL = 0
-# JS_AXIS_LEFT_VERTICAL = 1
-# JS_AXIS_LEFT_HORIZONTAL = 2
+JS_AXIS_LEFT_VERTICAL = 1
+JS_AXIS_RIGHT_HORIZONTAL = 2
 JS_AXIS_RIGHT_VERTICAL = 3
 
 
@@ -42,20 +42,30 @@ def joystick_axes_to_kv(joystick) -> dict:
     Map joystick buttons/axes to ControlInput.
     Adjust mapping for Kolke KGJ-182 if needed.
     Return raw joystick state as key-value dict.
+    Includes camera pan/tilt axes (mapped to percent).
     """
-    axis_omega = joystick.get_axis(JS_AXIS_LEFT_HORIZONTAL)
+    axis_omega = joystick.get_axis(JS_AXIS_RIGHT_HORIZONTAL)
     axis_speed = joystick.get_axis(JS_AXIS_RIGHT_VERTICAL)
+    axis_pan = joystick.get_axis(JS_AXIS_LEFT_HORIZONTAL)
+    axis_tilt = joystick.get_axis(JS_AXIS_LEFT_VERTICAL)
 
-    # Deadzone
+    # Deadzone helper
     deadzone = 0.2
-    if abs(axis_omega) < deadzone:
-        axis_omega = 0.0
-    if abs(axis_speed) < deadzone:
-        axis_speed = 0.0
+
+    def _dz(v):
+        return 0.0 if abs(v) < deadzone else v
+
+    axis_omega = _dz(axis_omega)
+    axis_speed = _dz(axis_speed)
+    axis_pan = _dz(axis_pan)
+    axis_tilt = _dz(axis_tilt)
 
     return {
-        "speed_percent": int(-axis_speed * 255),  # forward/backward
-        "omega_percent": int(axis_omega * 255),
+        "speed_percent": int(-axis_speed * 255),   # forward/backward
+        "omega_percent": int(axis_omega * 255),    # steering
+        "cam_pan_percent": int(axis_pan * 255),    # camera pan (-255..255)
+        # camera tilt inverted for natural up/down
+        "cam_tilt_percent": int(-axis_tilt * 255)
     }
 
 
@@ -103,7 +113,9 @@ cart = Cart("configs/cart.yml")
 drawer = Drawer("configs/graphics.yml", cart)
 
 
-predefined_points = [[980, 1234], [880, 120], [1367, 102], [2145, 1001]]
+# [[980, 1234], [880, 120], [1367, 102], [2145, 1001]]
+predefined_points = [[980, 1234], [920, 646], [1354, 617], [1561, 1125]]
+# [[980, 1234], [920, 646], [1354, 617], [1561, 1125]]
 
 observer = Observer(predefined_points=predefined_points)
 observer.run_calibration(drawer.screen)
@@ -153,7 +165,7 @@ while running:
 
     # Send inputs if any
     if inputs:
-        comm.send(inputs)
+       # comm.send(inputs)
         cart.apply_inputs(inputs)
 
     # -------------------------------------------------------------------

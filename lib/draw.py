@@ -157,8 +157,22 @@ class Drawer:
             self.blade_pos[0] * math.sin(heading_rad) + \
             self.blade_pos[1] * math.cos(heading_rad)
         blade_center_display = world_to_display((blade_x, blade_y))
-        pygame.draw.circle(self.screen, circle_color, blade_center_display, int(
-            self.blade_diameter * self.scale // 4))
+
+        # compute cart width in pixels using rear and front corner pairs,
+        # pick the larger one and make blade diameter ~80% of that width
+        def _dist(p, q):
+            return math.hypot(p[0] - q[0], p[1] - q[1])
+
+        rear_width_px = _dist(body_corners_display[0], body_corners_display[1])
+        front_width_px = _dist(
+            body_corners_display[2], body_corners_display[3])
+        cart_width_px = max(rear_width_px, front_width_px)
+
+        blade_diameter_px = 0.8 * cart_width_px
+        blade_radius_px = max(1, int(blade_diameter_px / 2))
+
+        pygame.draw.circle(self.screen, circle_color,
+                           blade_center_display, blade_radius_px)
 
         # --- Heading indicator ---
         tip_length = cart_size / 2
