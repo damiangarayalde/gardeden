@@ -5,7 +5,7 @@ import time
 
 
 class Drawer:
-    def __init__(self, initial_config, cart):
+    def __init__(self, initial_config, cart, camera_mode="camera"):
 
         pygame.display.set_caption("Cart Simulation")
 
@@ -23,6 +23,7 @@ class Drawer:
                             max(1, int(cfg_h * scale)))
         self.cart_size = 1  # Default size
         self.scale = 1
+        self.mode = camera_mode
         self.offset = (0, 0)
         self.cart_image = None
         self.screen = pygame.display.set_mode(
@@ -435,7 +436,7 @@ class Drawer:
             observer=observer
         )
 
-    def draw_scene(self, job_path, cart, mode="zenital", observer=None):
+    def draw_scene(self, job_path, cart,  observer=None):
         """
         Draws the entire simulation scene: job path, walked path, and cart.
         Supports three modes: zenital, camera, or both (split screen).
@@ -446,6 +447,8 @@ class Drawer:
             mode (str): "zenital", "camera", or "both"
             observer (Observer): Required for camera and both modes
         """
+        mode = self.mode
+
         if mode in ["camera", "both"] and observer is None:
             raise ValueError("observer is required for camera and both modes")
 
