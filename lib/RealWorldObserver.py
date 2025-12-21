@@ -7,7 +7,7 @@ import pygame
 class Observer:
     """Homography, calibration of work field, custom transformation from image to real world, AR overlay with pygame."""
 
-    def __init__(self, snapshot_path="snapshot.jpg", predefined_points=None):
+    def __init__(self, snapshot_path="snapshot.jpg", predefined_points=None, screen=None):
 
         # Adjust units (cm, m, etc.)
         self.pts_world = np.array([
@@ -50,6 +50,8 @@ class Observer:
                 self.calibrate_with_points()
             else:
                 print("Error: Predefined points must contain exactly 4 points")
+        else:
+            self.run_calibration(screen)
 
     def calibrate_with_points(self):
         """Calibrate using predefined 4 image points → world coords."""

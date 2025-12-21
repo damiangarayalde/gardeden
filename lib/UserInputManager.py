@@ -178,7 +178,7 @@ class UserInputManager:
 
         # Poll joystick separately each frame
         if self.joystick:
-            inputs.update(self._joystick_axes_to_kv(self.joystick))
+            inputs.update(self._joystick_axes_to_kv())
 
         return inputs, running
 

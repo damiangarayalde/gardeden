@@ -2,7 +2,7 @@ world:
   #rect: [0, 0, 12.7, 4.8]  # grande
   rect: [0, 0, 3.5, 2.1]  # chico
 
-cart:
+robot:
   # Fixed specs
   rect: [0, 0, 0.4, 0.5]  # grande
   blade_pos: [0, 0]

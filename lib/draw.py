@@ -246,6 +246,7 @@ class Drawer:
             mode (str): "zenital" (top-down view) or "camera" (projected on snapshot)
             observer (Observer): required if mode="camera"
         """
+
         if not job_path or len(job_path) < 2:
             return
 
@@ -436,18 +437,19 @@ class Drawer:
             observer=observer
         )
 
-    def draw_scene(self, job_path, cart,  observer=None):
+    def draw_scene(self, cart,  observer=None):
         """
         Draws the entire simulation scene: job path, walked path, and cart.
         Supports three modes: zenital, camera, or both (split screen).
 
         Args:
-            job_path (list): List of job path points
             cart: Cart instance with state and specs
             mode (str): "zenital", "camera", or "both"
             observer (Observer): Required for camera and both modes
         """
         mode = self.mode
+
+        job_path = cart.job_path
 
         if mode in ["camera", "both"] and observer is None:
             raise ValueError("observer is required for camera and both modes")

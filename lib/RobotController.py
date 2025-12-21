@@ -1,5 +1,6 @@
 import math
 import yaml
+from lib.path import get_job_path
 
 
 def normalize_angle(angle_deg: float) -> float:
@@ -10,8 +11,8 @@ def normalize_angle(angle_deg: float) -> float:
     return wrapped
 
 
-class CartSpecs:
-    """Static configuration parameters of the cart (do not change over time)."""
+class RobotSpecs:
+    """Static configuration parameters of the robot (do not change over time)."""
 
     def __init__(self, config: dict):
         self.rect = config["rect"]
@@ -25,8 +26,8 @@ class CartSpecs:
         self.overlap = config.get("overlap", 0.2)
 
 
-class CartState:
-    """Time-varying state of the cart (changes as it moves)."""
+class RobotState:
+    """Time-varying state of the robot (changes as it moves)."""
 
     def __init__(self, initial_pose, config: dict):
         self.x, self.y, self.heading_deg = initial_pose   # (m, m, deg)
@@ -42,8 +43,8 @@ class CartState:
         self.horn = config["horn"]
 
 
-class Cart:
-    """Main cart model, including specs, state, and control logic."""
+class Robot:
+    """Main robot model, including specs, state, and control logic."""
 
     def __init__(self, initial_config="config.yml"):
         # Load config
@@ -51,15 +52,17 @@ class Cart:
             config = yaml.safe_load(f)
 
         # Separate static and dynamic parts
-        self.specs = CartSpecs(config["cart"])
+        self.specs = RobotSpecs(config["robot"])
         # x,y, angle in degrees
-        self.state = CartState(initial_pose=(
-            self.specs.blade_diameter/2, self.specs.blade_diameter/2, 0), config=config["cart"])
+        self.state = RobotState(initial_pose=(
+            self.specs.blade_diameter/2, self.specs.blade_diameter/2, 0), config=config["robot"])
         self.world_rect = config["world"]["rect"]
 
         # Task/path-following parameters
-        self.job_path = None
         self.current_path_index = 0
+
+        self.job_path = get_job_path(
+            self, safety_buffer=self.specs.turn_radius + 0.2)
 
     # -------------------------------------------------------------------------
     # Retrievers for cart parameters needed by other modules
