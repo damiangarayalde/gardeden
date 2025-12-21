@@ -5,27 +5,17 @@ from lib.CommModule import CommModule
 from lib.RealWorldObserver import Observer
 from lib.UserInputManager import UserInputManager
 
-# ====== Network settings ======
-ESP32_IP = "192.168.0.16"
-ESP32_PORT = 4210
-LOCAL_IP = "0.0.0.0"   # listen on all interfaces
-FPS = 20
-
-
 # ------------------------------ Init
 pygame.init()
 clock = pygame.time.Clock()
-
+comm = CommModule("configs/comms.yml")
 robot = Robot("configs/robot.yml")
 drawer = Drawer("configs/graphics.yml", robot, camera_mode="camera")
 # [[980, 1234], [880, 120], [1367, 102], [2145, 1001]]
 predefined_points = [[980, 1234], [920, 646], [1354, 617], [1561, 1125]]
 observer = Observer(predefined_points=predefined_points, screen=drawer.screen)
-
-
-comm = CommModule(ESP32_IP, ESP32_PORT, bind_ip=LOCAL_IP)
 ui = UserInputManager(comm_module=comm, debug=True)
-
+FPS = 20
 running = True
 
 while running:

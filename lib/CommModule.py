@@ -1,14 +1,24 @@
 import socket
 import json
+import yaml
 
 
 class CommModule:
-    def __init__(self, udp_address: str, udp_port: int, bind_ip="0.0.0.0"):
+    def __init__(self, initial_config="comms.yml"):
         """
         udp_address: destination address (ESP32 or PC)
         udp_port: destination port
         bind_ip: local bind address (default all interfaces)
         """
+
+        # Load config from YAML
+        with open(initial_config, "r") as f:
+            config = yaml.safe_load(f)
+
+        udp_address = config["network"]["ESP32_IP"]
+        udp_port = config["network"]["ESP32_PORT"]
+        bind_ip = config["network"]["LOCAL_IP"]
+
         self.udp_address = udp_address
         self.udp_port = udp_port
 

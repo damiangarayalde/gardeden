@@ -1,0 +1,6 @@
+# ====== Network settings ======
+network:
+  ESP32_IP: '192.168.0.16'
+  ESP32_PORT: 4210
+  LOCAL_IP: '0.0.0.0' # listen on all interfaces
+  FPS: 20
