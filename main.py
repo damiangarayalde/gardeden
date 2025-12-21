@@ -115,7 +115,6 @@ drawer = Drawer("configs/graphics.yml", cart)
 
 # [[980, 1234], [880, 120], [1367, 102], [2145, 1001]]
 predefined_points = [[980, 1234], [920, 646], [1354, 617], [1561, 1125]]
-# [[980, 1234], [920, 646], [1354, 617], [1561, 1125]]
 
 observer = Observer(predefined_points=predefined_points)
 observer.run_calibration(drawer.screen)
@@ -125,7 +124,6 @@ job_path = get_job_path(
 
 cart.set_job_path(job_path)
 
-# Comms
 comm = CommModule(ESP32_IP, ESP32_PORT, bind_ip=LOCAL_IP)
 
 running = True
@@ -139,7 +137,8 @@ while running:
     measured_cart_pose = cart.estimate_next_pose(dt=1.0)
 
     if measured_cart_pose is not None:
-        cart.set_pose(measured_cart_pose)  # update pose
+        # update the model pose with metrology
+        cart.set_pose(measured_cart_pose)
 
     # -------------------------------------------------------------------
     # Check for inputs: local (keyboard or joystick + remote)
@@ -158,22 +157,26 @@ while running:
     if joystick:
         inputs.update(joystick_axes_to_kv(joystick))
 
-    # Handle incoming data
+    # -------------------------------------------------------------------
+    # Handle incoming data from surrogate robot (remote inputs)
     # remote_inputs = comm.receive()
     # if remote_inputs:
     #     print("Remote inputs:", remote_inputs)
 
-    # Send inputs if any
+    # -------------------------------------------------------------------
+
     if inputs:
-       # comm.send(inputs)
+       # comm.send(inputs)          # Send surrogate robot latest inputs ...
+        # ... and apply those to the local cart model
         cart.apply_inputs(inputs)
 
     # -------------------------------------------------------------------
-    # Update
-    #  //cart.updateMotors();
-    cart.run_controller()
 
-    # drawer.draw_scene(job_path, cart)
-    drawer.draw_scene(job_path, cart, mode="camera", observer=observer)
+    cart.run_controller()  # Update direction based on target path and current pose
+
+    # -------------------------------------------------------------------
+
+    # Render simulation and observer view
+    drawer.draw_scene(job_path, cart, mode="zenital", observer=observer)
 
 pygame.quit()

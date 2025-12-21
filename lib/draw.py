@@ -13,8 +13,14 @@ class Drawer:
         with open(initial_config, "r") as f:
             config = yaml.safe_load(f)
 
-        self.window_size = (config["graphics"]["width"],
-                            config["graphics"]["height"])
+        # preserve config aspect ratio but maximize to fit the current display
+        cfg_w = config["graphics"]["width"]
+        cfg_h = config["graphics"]["height"]
+        info = pygame.display.Info()
+        disp_w, disp_h = info.current_w, info.current_h
+        scale = min(disp_w / cfg_w, disp_h / cfg_h)
+        self.window_size = (max(1, int(cfg_w * scale)),
+                            max(1, int(cfg_h * scale)))
         self.cart_size = 1  # Default size
         self.scale = 1
         self.offset = (0, 0)
@@ -158,18 +164,19 @@ class Drawer:
             self.blade_pos[1] * math.cos(heading_rad)
         blade_center_display = world_to_display((blade_x, blade_y))
 
-        # compute cart width in pixels using rear and front corner pairs,
-        # pick the larger one and make blade diameter ~80% of that width
+        # compute largest distance from any body corner to the blade center (in pixels)
         def _dist(p, q):
             return math.hypot(p[0] - q[0], p[1] - q[1])
 
-        rear_width_px = _dist(body_corners_display[0], body_corners_display[1])
-        front_width_px = _dist(
-            body_corners_display[2], body_corners_display[3])
-        cart_width_px = max(rear_width_px, front_width_px)
+        # body_corners_display is a list of (x,y) screen coordinates
+        max_corner_dist = 0.0
+        for corner in body_corners_display:
+            d = _dist(corner, blade_center_display)
+            if d > max_corner_dist:
+                max_corner_dist = d
 
-        blade_diameter_px = 0.8 * cart_width_px
-        blade_radius_px = max(1, int(blade_diameter_px / 2))
+        # blade radius = 80% of the largest corner->center distance
+        blade_radius_px = max(1, int(max_corner_dist*0.5))
 
         pygame.draw.circle(self.screen, circle_color,
                            blade_center_display, blade_radius_px)
