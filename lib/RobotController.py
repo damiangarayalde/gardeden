@@ -65,7 +65,7 @@ class Robot:
             self, safety_buffer=self.specs.turn_radius + 0.2)
 
     # -------------------------------------------------------------------------
-    # Retrievers for cart parameters needed by other modules
+    # Retrievers for robot parameters needed by other modules
     # -------------------------------------------------------------------------
 
     def get_walked_path(self):
@@ -78,7 +78,7 @@ class Robot:
     # State management
     # -------------------------------------------------------------------------
     def set_pose(self, pose):
-        """Update the cart's current pose."""
+        """Update the robot's current pose."""
         self.state.x, self.state.y, self.state.heading_deg = pose
         self.state.heading_deg = normalize_angle(self.state.heading_deg)
         self.state.walked_path.append((self.state.x, self.state.y))
@@ -198,7 +198,7 @@ class Robot:
         sp_norm = inputs.get("speed_percent", 0) / 255.0
         omega_norm = inputs.get("omega_percent", 0) / 255.0
 
-        # Apply to cart
+        # Apply to robot
         self.set_speed_percent(sp_norm)
         self.set_angular_rate(omega_norm)
 
@@ -207,7 +207,7 @@ class Robot:
     # -------------------------------------------------------------------------
 
     def set_job_path(self, job_path):
-        """Set the desired path for the cart to follow."""
+        """Set the desired path for the robot to follow."""
         self.job_path = job_path
         self.current_path_index = 0
 
@@ -250,7 +250,7 @@ class Robot:
         self._update_wheel_speeds(omega)
 
     def run_controller(self):
-        """Update the cart state based on sensors and user input."""
+        """Update the robot state based on sensors and user input."""
 
         # printf("\033[A"); // ESC[A moves the cursor up one line
         # printf("\033[2K");

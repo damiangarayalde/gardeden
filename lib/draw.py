@@ -5,9 +5,9 @@ import time
 
 
 class Drawer:
-    def __init__(self, initial_config, cart, camera_mode="camera"):
+    def __init__(self, initial_config, robot, camera_mode="camera"):
 
-        pygame.display.set_caption("Cart Simulation")
+        pygame.display.set_caption("robot Simulation")
 
         # Load config from YAML
         with open(initial_config, "r") as f:
@@ -21,19 +21,19 @@ class Drawer:
         scale = min(disp_w / cfg_w, disp_h / cfg_h)
         self.window_size = (max(1, int(cfg_w * scale)),
                             max(1, int(cfg_h * scale)))
-        self.cart_size = 1  # Default size
+        self.robot_size = 1  # Default size
         self.scale = 1
         self.mode = camera_mode
         self.offset = (0, 0)
-        self.cart_image = None
+        self.robot_image = None
         self.screen = pygame.display.set_mode(
             self.window_size, pygame.RESIZABLE)
+        self.robot = robot
+        self.set_world_space(robot.world_rect)
 
-        self.set_world_space(cart.world_rect)
-
-        self.set_cart_size(rect=cart.specs.rect,
-                           blade_pos=cart.specs.blade_pos,
-                           blade_diameter=cart.get_blade_diameter())
+        self.set_robot_size(rect=robot.specs.rect,
+                            blade_pos=robot.specs.blade_pos,
+                            blade_diameter=robot.get_blade_diameter())
 
     def set_world_space(self, rect):
         """Map rect to 80% of window, keep aspect ratio."""
@@ -50,14 +50,14 @@ class Drawer:
         self.offset = ((wx - mapped_w) / 2 - rect[0] * self.scale,
                        (wy - mapped_h) / 2 - rect[1] * self.scale)
 
-    def set_cart_size(self, rect, blade_pos, blade_diameter):
+    def set_robot_size(self, rect, blade_pos, blade_diameter):
         """
-        Configure cart size and blade parameters.
-        rect: bounding box for cart in local coordinates
-        blade_pos: (x, y) offset from cart center
+        Configure robot size and blade parameters.
+        rect: bounding box for robot in local coordinates
+        blade_pos: (x, y) offset from robot center
         blade_diameter: effective blade diameter in cm
         """
-        self.cart_size = max(rect[2] - rect[0], rect[3] - rect[1])
+        self.robot_size = max(rect[2] - rect[0], rect[3] - rect[1])
         self.blade_pos = blade_pos
         self.blade_diameter = blade_diameter
 
@@ -106,32 +106,32 @@ class Drawer:
         sy = y * self.scale + self.offset[1]
         return sx, sy
 
-    def draw_cart(self, cart_pose,
-                  cart_rear_lights=False,
-                  cart_tracking_enabled=False,
-                  cart_horn_active=True,
-                  mode="zenital",
-                  observer=None):
+    def draw_robot(self, robot_pose,
+                   robot_rear_lights=False,
+                   robot_tracking_enabled=False,
+                   robot_horn_active=True,
+                   mode="zenital",
+                   observer=None):
         """
-        Draws a cart at (x, y, heading) with given wheel angle.
+        Draws a robot at (x, y, heading) with given wheel angle.
         Supports both zenital (top-down) and camera (projected) modes.
 
         Args:
-            cart_pose: (x, y, heading) world coordinates
-            cart_rear_lights: whether rear lights are active
-            cart_tracking_enabled: whether tracking cone is visible
-            cart_horn_active: whether horn/blade is active
+            robot_pose: (x, y, heading) world coordinates
+            robot_rear_lights: whether rear lights are active
+            robot_tracking_enabled: whether tracking cone is visible
+            robot_horn_active: whether horn/blade is active
             mode (str): "zenital" (top-down view) or "camera" (projected on snapshot)
             observer (Observer): required if mode="camera"
         """
         if mode == "camera" and observer is None:
             raise ValueError("observer is required for camera projection mode")
 
-        x, y, heading = cart_pose
+        x, y, heading = robot_pose
         heading_rad = math.radians(heading)
-        cart_size = 0.5  # base size in world units
+        robot_size = 0.5  # base size in world units
 
-        half = cart_size / 2
+        half = robot_size / 2
 
         # --- Helper: world → display (screen) coords ---
         def world_to_display(pt):
@@ -145,7 +145,7 @@ class Drawer:
                 v_scr = int(v_img * screen_h / img_h)
                 return (u_scr, v_scr)
 
-        # --- Cart body ---
+        # --- robot body ---
         body_corners_world = [
             (x + dx * math.cos(heading_rad) - dy * math.sin(heading_rad),
              y + dx * math.sin(heading_rad) + dy * math.cos(heading_rad))
@@ -156,7 +156,8 @@ class Drawer:
         pygame.draw.polygon(self.screen, (0, 100, 200), body_corners_display)
 
         # --- Blade circle ---
-        circle_color = (100, 210, 210) if cart_horn_active else (120, 220, 250)
+        circle_color = (100, 210, 210) if robot_horn_active else (
+            120, 220, 250)
         blade_x = x + \
             self.blade_pos[0] * math.cos(heading_rad) - \
             self.blade_pos[1] * math.sin(heading_rad)
@@ -183,7 +184,7 @@ class Drawer:
                            blade_center_display, blade_radius_px)
 
         # --- Heading indicator ---
-        tip_length = cart_size / 2
+        tip_length = robot_size / 2
         tip_x = x + tip_length * math.cos(heading_rad)
         tip_y = y + tip_length * math.sin(heading_rad)
         center_display = world_to_display((x, y))
@@ -192,9 +193,9 @@ class Drawer:
                          center_display, tip_display, 3)
 
         # --- Rear lights ---
-        light_w = cart_size * 0.07
-        light_h = cart_size * 0.15
-        side_offset = cart_size * 0.25
+        light_w = robot_size * 0.07
+        light_h = robot_size * 0.15
+        side_offset = robot_size * 0.25
 
         t = time.time()
         blink_on = int(t % 1.0 < 0.5)
@@ -210,7 +211,7 @@ class Drawer:
                 dy_local * math.cos(heading_rad)
 
             color = blink_color if (
-                cart_rear_lights and blink_on) else standby_color
+                robot_rear_lights and blink_on) else standby_color
 
             rect_corners_world = [
                 (cx + ldx * math.cos(heading_rad) - ldy * math.sin(heading_rad),
@@ -225,7 +226,7 @@ class Drawer:
             pygame.draw.polygon(self.screen, color, rect_corners_display)
 
         # --- Tracking cone ---
-        if cart_tracking_enabled:
+        if robot_tracking_enabled:
             cone_length = half
             cone_angle = math.radians(10)
             cone_points_world = [(x, y)] + [
@@ -237,7 +238,7 @@ class Drawer:
             pygame.draw.polygon(self.screen, (255, 0, 0),
                                 cone_points_display, 0)
 
-    def draw_job_path(self, job_path, mode="zenital", observer=None):
+    def draw_job_path(self, mode="zenital", observer=None):
         """
         Draw the job path with labels at start, mid, and end.
 
@@ -246,6 +247,7 @@ class Drawer:
             mode (str): "zenital" (top-down view) or "camera" (projected on snapshot)
             observer (Observer): required if mode="camera"
         """
+        job_path = self.robot.job_path
 
         if not job_path or len(job_path) < 2:
             return
@@ -276,8 +278,8 @@ class Drawer:
 
         # --- Draw path ---
 
-        color = (100, 100, 255, 128) if mode == "camera" else (
-            100, 100, 255, 128)
+        color = (100, 100, 255, 200) if mode == "camera" else (
+            100, 100, 255, 200)
 
         # draw on an SRCALPHA surface then blit to preserve translucency
         overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
@@ -347,8 +349,8 @@ class Drawer:
         overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
 
         # semi-transparent colors (RGBA)
-        coverage_color = (50, 120, 50, 128)  # 50% alpha
-        line_color = (0, 150, 0, 128)       # 50% alpha
+        coverage_color = (50, 120, 50, 150)  # 50% alpha
+        line_color = (0, 150, 0, 150)       # 50% alpha
 
         # Draw blade coverage circles onto overlay
         for pos in path_points:
@@ -362,7 +364,7 @@ class Drawer:
         # Blit overlay onto main screen
         self.screen.blit(overlay, (0, 0))
 
-    def dim_background(self, alpha=128, color=(0, 0, 0)):
+    def dim_background(self, alpha=150, color=(0, 0, 0)):
         """Draw a translucent overlay over the current screen to dim the background.
         alpha: 0..255 (128 ≈ 50% dim)
         """
@@ -370,39 +372,39 @@ class Drawer:
         overlay.fill((color[0], color[1], color[2], alpha))
         self.screen.blit(overlay, (0, 0))
 
-    def _draw_zenital_view(self, job_path, cart):
+    def _draw_zenital_view(self, robot):
         """Helper method to draw the zenital view"""
         # Draw debug rectangles (background/field)
         self.draw_debug_rects(
-            cart.world_rect,
+            robot.world_rect,
             margin_x=0.0,
             margin_y=0.0,
-            safety_buffer=cart.specs.turn_radius + 0.2
+            safety_buffer=robot.specs.turn_radius + 0.2
         )
 
-        # Dim background so job/walked paths and cart stand out
-        self.dim_background(alpha=128)
+        # Dim background so job/walked paths and robot stand out
+        self.dim_background()
 
         # Draw job path
-        self.draw_job_path(job_path, mode='zenital')
+        self.draw_job_path(mode='zenital')
 
         # Draw walked path
         self.draw_walked_path(
-            cart.get_walked_path(),
-            blade_diameter=cart.get_blade_diameter(),
+            robot.get_walked_path(),
+            blade_diameter=robot.get_blade_diameter(),
             mode='zenital'
         )
 
-        # Draw cart
-        self.draw_cart(
-            cart_pose=cart.get_pose(),
-            cart_rear_lights=cart.state.paused,
-            cart_tracking_enabled=cart.state.tracking_enabled,
-            cart_horn_active=cart.state.horn,
+        # Draw robot
+        self.draw_robot(
+            robot_pose=robot.get_pose(),
+            robot_rear_lights=robot.state.paused,
+            robot_tracking_enabled=robot.state.tracking_enabled,
+            robot_horn_active=robot.state.horn,
             mode='zenital'
         )
 
-    def _draw_camera_view(self, job_path, cart, observer):
+    def _draw_camera_view(self, robot, observer):
         """Helper method to draw the camera view"""
         # Get window size for current surface (might be full screen or half)
         screen_w, screen_h = self.screen.get_size()
@@ -414,42 +416,40 @@ class Drawer:
         self.screen.blit(background, (0, 0))
 
         # Dim the background so overlays are clearer
-        self.dim_background(alpha=128)
+        self.dim_background()
 
         # Draw job path
-        self.draw_job_path(job_path, mode="camera", observer=observer)
+        self.draw_job_path(mode="camera", observer=observer)
 
         # Draw walked path
         self.draw_walked_path(
-            walked_path=cart.state.walked_path,
-            blade_diameter=cart.specs.blade_diameter,
+            walked_path=robot.state.walked_path,
+            blade_diameter=robot.specs.blade_diameter,
             mode="camera",
             observer=observer
         )
 
-        # Draw cart
-        self.draw_cart(
-            cart_pose=cart.get_pose(),
-            cart_rear_lights=cart.state.paused,
-            cart_tracking_enabled=cart.state.tracking_enabled,
-            cart_horn_active=cart.state.horn,
+        # Draw robot
+        self.draw_robot(
+            robot_pose=robot.get_pose(),
+            robot_rear_lights=robot.state.paused,
+            robot_tracking_enabled=robot.state.tracking_enabled,
+            robot_horn_active=robot.state.horn,
             mode="camera",
             observer=observer
         )
 
-    def draw_scene(self, cart,  observer=None):
+    def draw_scene(self, robot,  observer=None):
         """
-        Draws the entire simulation scene: job path, walked path, and cart.
+        Draws the entire simulation scene: job path, walked path, and robot.
         Supports three modes: zenital, camera, or both (split screen).
 
         Args:
-            cart: Cart instance with state and specs
+            robot: robot instance with state and specs
             mode (str): "zenital", "camera", or "both"
             observer (Observer): Required for camera and both modes
         """
         mode = self.mode
-
-        job_path = cart.job_path
 
         if mode in ["camera", "both"] and observer is None:
             raise ValueError("observer is required for camera and both modes")
@@ -478,24 +478,24 @@ class Drawer:
             self.screen = zenital_surface
 
             # Draw zenital view
-            self._draw_zenital_view(job_path, cart)
+            self._draw_zenital_view(robot)
 
             # Switch to camera subsurface
             self.screen = camera_surface
 
             # Draw camera view
-            self._draw_camera_view(job_path, cart, observer)
+            self._draw_camera_view(robot, observer)
 
             # Restore original screen
             self.screen = original_screen
 
         elif mode == "zenital":
             # Draw only zenital view
-            self._draw_zenital_view(job_path, cart)
+            self._draw_zenital_view(robot)
 
         elif mode == "camera":
             # Draw only camera view
-            self._draw_camera_view(job_path, cart, observer)
+            self._draw_camera_view(robot, observer)
 
         # Finally update the display
         pygame.display.flip()
