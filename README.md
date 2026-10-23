@@ -1,5 +1,7 @@
 # Gardeden
 
+[![tests](https://github.com/damiangarayalde/gardeden/actions/workflows/tests.yml/badge.svg)](https://github.com/damiangarayalde/gardeden/actions/workflows/tests.yml)
+
 **An autonomous lawn-mowing robot, built step by step: simulation first, then the real thing.**
 
 Gardeden is a personal training project. After some time away from robotics I wanted to get back into it with a hands-on robotics and simulation build, so I picked a task I do every week: mowing the lawn. The goal is a small robotic mower that cuts the lawn by itself, follows an efficient coverage path, and hands control back to a person at any moment.
@@ -36,10 +38,10 @@ Gardeden is my way of working through each of these, end to end, on a project I 
 
 | Area | What it does | Where |
 |---|---|---|
-| **Coverage path planning** | Generates a back-and-forth ("boustrophedon") mowing pattern over the lawn. Lane spacing comes from the blade diameter and a configurable overlap, and the turns between lanes are joined with **Dubins curves** so the path respects the mower's minimum turning radius. | [lib/path.py](lib/path.py) |
-| **Path following** | A **pure-pursuit** controller with a speed-dependent lookahead steers the robot along the planned path. It only searches about 1 m forward along the path, so a sideways push can't make it skip to the next lane. Steering is capped at the mower's minimum turning radius, and the robot stops when the job is done, reporting any waypoints it missed. | [lib/RobotController.py](lib/RobotController.py) |
+| **Coverage path planning** | Generates a back-and-forth ("boustrophedon") mowing pattern over the lawn. Lane spacing comes from the blade diameter and a configurable overlap, and the turns between lanes are joined with **Dubins curves** so the path respects the mower's minimum turning radius. The job starts with a lap around the edge, which cuts the strips at the lane ends where the turns happen. With perfect tracking it covers 99.2% of the lawn; only the four corners stay uncut, because a 0.2 m turning radius can't square them off. | [lib/path.py](lib/path.py) |
+| **Path following** | A **pure-pursuit** controller with a speed-dependent lookahead steers the robot along the planned path. It only searches about 1 m forward along the path, so a sideways push can't make it skip to the next lane. Steering is capped at the mower's minimum turning radius. The speed I set is a ceiling: the controller slows down for curves to keep cornering under `max_lateral_accel`. When nothing uncut is left ahead, or reaching it would mean re-driving already-cut lane, the robot heads for the next uncut stretch. That covers grass missed after a push, and it skips grass I already cut by hand. If it comes back for a patch and still misses it, it gives up on that patch and reports it, instead of circling forever. | [lib/RobotController.py](lib/RobotController.py) |
 | **Robot model** | Differential-drive kinematics: linear and angular velocity in, left/right wheel speeds and a new pose out. It also records the area already cut: every planned waypoint the blade passes over (within 10 cm), whether in manual or auto mode, is marked as covered. | [lib/RobotController.py](lib/RobotController.py) |
-| **Manual / auto switching** | Drive manually with a joystick or keyboard, then toggle auto mode. In auto mode the controller does the steering and I still set the speed. You can pause at any time or push the robot sideways to check that the controller recovers. When auto mode comes back on, the robot resumes at the **first uncut waypoint**. If that waypoint is far away, it plans a Dubins transit there (drawn in yellow), so it arrives lined up with the lane instead of cutting in partway. | [lib/UserInputManager.py](lib/UserInputManager.py) |
+| **Manual / auto switching** | Drive manually with a joystick or keyboard, then toggle auto mode. In auto mode the controller does the steering and I still set the speed (forward only, since pure pursuit can't steer in reverse). You can pause at any time or push the robot sideways to check that the controller recovers. When auto mode comes back on, the robot resumes at the **first uncut waypoint**. If that waypoint is far away, it plans a Dubins transit there (drawn in yellow), so it arrives lined up with the lane instead of cutting in partway. | [lib/UserInputManager.py](lib/UserInputManager.py) |
 | **Camera view (AR overlay)** | A homography, calibrated from 4 points on a real photo of the garden, maps lawn coordinates in meters to camera pixels. The planned path, the cut area and the robot are drawn in perspective on top of the actual image. | [lib/RealWorldObserver.py](lib/RealWorldObserver.py), [lib/draw.py](lib/draw.py) |
 | **Visualization** | Top-down ("zenital") view, camera view, or both side by side. | [lib/draw.py](lib/draw.py) |
 | **Robot comms (groundwork)** | A UDP/JSON link to an ESP32 on the robot that sends the same control inputs the simulator uses. Off by default (`enabled` in `configs/comms.yml`). | [lib/CommModule.py](lib/CommModule.py) |
@@ -70,7 +72,7 @@ Requires [uv](https://docs.astral.sh/uv/) (`brew install uv`) and, optionally, a
 ```sh
 uv sync                 # create/update .venv from pyproject.toml + uv.lock
 uv run main.py          # run from the repo root, since config paths are relative
-uv run pytest           # run the tests
+uv run pytest           # run the tests (CI runs the same on every push: .github/workflows/tests.yml)
 ```
 
 `uv run` always uses the project's `.venv`, so there's nothing to activate. If you prefer, `source .venv/bin/activate` and then plain `python main.py` / `pytest` work too. To add a dependency, use `uv add <package>` (or `uv add --group dev <package>` for dev-only tools). For the notebooks in `experiments/`, run `uv sync --group notebooks`.
@@ -98,7 +100,7 @@ Button numbers can differ between controllers. If yours doesn't match, adjust th
 
 | File | What you can tune |
 |---|---|
-| [configs/robot.yml](configs/robot.yml) | Lawn size (`world.rect`, in meters), blade diameter, wheelbase, turning radius, lane overlap, keyboard step sizes and joystick max speeds (m/s, rad/s), and whether the robot starts paused or in auto mode. |
+| [configs/robot.yml](configs/robot.yml) | Lawn size (`world.rect`, in meters), blade diameter, wheelbase, turning radius, lane overlap, keyboard step sizes and joystick max speeds (m/s, rad/s), the cornering limit for auto mode (`max_lateral_accel`), and whether the robot starts paused or in auto mode. |
 | [configs/camera.yml](configs/camera.yml) | Garden snapshot and the 4 calibration points (lawn corners in image pixels). |
 | [configs/graphics.yml](configs/graphics.yml) | Window size. |
 | [configs/comms.yml](configs/comms.yml) | Whether to send inputs to the robot, plus the ESP32 IP address and UDP port. |
