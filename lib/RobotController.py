@@ -1,7 +1,7 @@
 import math
 import numpy as np
 import yaml
-from lib.path import get_job_path, dubins_segment
+from lib.path import get_job_path, dubins_segment, angle_wrap
 
 WALKED_PATH_MIN_STEP = 0.01  # m, minimum movement before a new walked_path point is recorded
 PURSUIT_SEARCH_DISTANCE = 1.0  # m of path ahead of the last matched waypoint to search
@@ -227,6 +227,14 @@ class Robot:
         self.job_path = job_path
         self._path_xy = np.array([(px, py) for px, py, *_ in job_path]).reshape(-1, 2)
         self.covered = np.zeros(len(job_path), dtype=bool)  # per waypoint: grass already cut
+        self.given_up = np.zeros(len(job_path), dtype=bool)  # uncut, but unreachable: stop retrying
+        # Only straight stretches (lanes, perimeter sides) must be cut. Turn arcs just link
+        # them: they bulge past COVERAGE_TOLERANCE of what the blade really cuts, so going
+        # back for "missed" arc waypoints would be pure wasted travel
+        theta = np.array([th for _, _, th, *_ in job_path])
+        straight = np.abs(angle_wrap(np.diff(theta))) < 1e-6
+        self.required = np.r_[straight, False] | np.r_[False, straight]
+        self._last_auto_resume = None
         # Waypoint spacing → how many waypoints make up PURSUIT_SEARCH_DISTANCE of path
         steps = np.hypot(*np.diff(self._path_xy, axis=0).T)
         self._path_step = float(np.median(steps)) if steps.size else 0.01
@@ -248,17 +256,25 @@ class Robot:
         self.covered |= d <= COVERAGE_TOLERANCE
 
     def first_uncovered_index(self):
-        """Index of the earliest waypoint not cut yet, or None if the whole job is cut."""
-        uncovered = np.flatnonzero(~self.covered)
-        return int(uncovered[0]) if uncovered.size else None
+        """Index of the earliest waypoint still to cut, or None if the whole job is done."""
+        todo = np.flatnonzero(self.required & ~(self.covered | self.given_up))
+        return int(todo[0]) if todo.size else None
 
-    def _resume_job(self):
+    def _resume_job(self, auto=False):
         """Continue from the first uncut waypoint, reaching it on a Dubins transit so the robot
-        arrives aligned with the lane instead of joining it partway and skipping grass."""
+        arrives aligned with the lane instead of joining it partway and skipping grass.
+        auto: called by the controller itself (not a user toggle) to go back for missed grass."""
         resume = self.first_uncovered_index()
+        if auto and resume is not None and resume == self._last_auto_resume:
+            # Came back for this patch and still missed it: give up on the whole uncut run
+            # rather than loop forever
+            run_end = resume + int(np.argmax(np.append(self.covered[resume:], True)))
+            self.given_up[resume:run_end] = True
+            print(f"Giving up on waypoints {resume}-{run_end - 1}: unreachable")
+            resume = self.first_uncovered_index()
+        self._last_auto_resume = resume if auto else None
         if resume is None:
-            print("Job already complete")
-            self.state.tracking_enabled = False
+            self._finish_job()
             return
         self.current_path_index = resume
         self.approach_path = None
@@ -299,11 +315,26 @@ class Robot:
             return
 
         self.current_path_index = self._pursue(self._path_xy, self.current_path_index, lookahead)
-        if self.current_path_index == len(self._path_xy) - 1:
-            missed = int((~self.covered).sum())
-            print("Job complete" + (f" ({missed} waypoints left uncut)" if missed else ""))
-            self.state.tracking_enabled = False
-            self.stop()
+        i = self.current_path_index
+        if self._should_jump(i):
+            # Go for the next uncut stretch: missed patches, or past grass already cut
+            self._resume_job(auto=True)
+
+    def _should_jump(self, i):
+        """True when following the path from waypoint i would cut nothing new: no uncut
+        waypoint left ahead, or at least PURSUIT_SEARCH_DISTANCE of already-cut lane to
+        re-drive before the next one (turn arcs don't count, they're just links)."""
+        todo_ahead = np.flatnonzero(self.required[i:] & ~(self.covered | self.given_up)[i:])
+        if todo_ahead.size == 0:
+            return True
+        already_cut = (self.required & self.covered)[i:i + todo_ahead[0]].sum()
+        return already_cut >= self._search_window
+
+    def _finish_job(self):
+        skipped = int(self.given_up.sum())
+        print("Job complete" + (f" ({skipped} unreachable waypoints left uncut)" if skipped else ""))
+        self.state.tracking_enabled = False
+        self.stop()
 
     def _pursue(self, path_xy, index, lookahead):
         """One pure-pursuit step along path_xy from waypoint index; returns the new index."""

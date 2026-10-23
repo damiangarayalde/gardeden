@@ -140,7 +140,7 @@ def test_completes_whole_job_on_path(robot, speed):
     assert not robot.state.tracking_enabled, "never reached the end of the job"
     assert robot.state.speed == 0
     assert max_err < 0.1
-    assert robot.covered.all(), f"{(~robot.covered).sum()} waypoints left uncut"
+    assert robot.covered[robot.required].all(), f"{(~robot.covered[robot.required]).sum()} waypoints left uncut"
 
 
 def test_blade_marks_waypoints_covered(robot):
@@ -238,3 +238,55 @@ def test_auto_mode_slows_for_curves(robot):
     in_corner = [v for v, h in zip(speeds, headings) if 20 < h < 70]
     assert max(speeds) == pytest.approx(0.6)  # full speed on the straight
     assert in_corner and max(in_corner) < 0.6 * 0.8  # clearly slower through the corner
+
+
+def run_job(robot, speed=0.4, max_steps=10000):
+    """Mow from the start of the job until auto mode switches itself off; returns steps."""
+    x0, y0, th0 = robot.job_path[0]
+    start_tracking(robot, (x0, y0, math.degrees(th0)), speed)
+    steps = 0
+    with contextlib.redirect_stdout(io.StringIO()):
+        while robot.state.tracking_enabled and steps < max_steps:
+            step(robot)
+            steps += 1
+    assert steps < max_steps, "job never finished"
+    return steps
+
+
+def test_goes_back_for_patch_missed_after_push(robot):
+    x0, y0, th0 = robot.job_path[0]
+    start_tracking(robot, (x0, y0, math.degrees(th0)), speed=0.4)
+    with contextlib.redirect_stdout(io.StringIO()):
+        step(robot, 400)
+    robot.apply_lateral_disturbance(0.25)  # big push: the controller skips a patch
+    with contextlib.redirect_stdout(io.StringIO()):
+        for _ in range(10000):
+            if not robot.state.tracking_enabled:
+                break
+            step(robot)
+    assert robot.covered[robot.required].all()
+
+
+def test_finishes_early_when_rest_already_cut_by_hand():
+    baseline = run_job(Robot(str(ROOT / "configs/robot.yml")))
+    robot = Robot(str(ROOT / "configs/robot.yml"))
+    robot.state.paused = False
+    for lane in lane_ys(robot)[-3:-1]:  # drive the last two inner lanes by hand first
+        for x in np.arange(0.4, 3.11, 0.02):
+            robot.set_pose((x, lane, 0.0))
+    # (skipping a lane mid-job saves nothing: lanes alternate, so you still travel its length)
+    assert run_job(robot) * DT < baseline * DT - 10
+    assert robot.covered[robot.required].all()
+
+
+def test_gives_up_on_unreachable_waypoint(robot):
+    lane_waypoints = np.flatnonzero(robot.required)
+    unreachable = lane_waypoints[len(lane_waypoints) // 2]
+    mark = robot._mark_covered
+    def mark_all_but_unreachable():
+        was = robot.covered[unreachable]
+        mark()
+        robot.covered[unreachable] = was
+    robot._mark_covered = mark_all_but_unreachable
+    run_job(robot)  # must terminate instead of circling back forever
+    assert robot.given_up[unreachable] and robot.given_up.sum() == 1
