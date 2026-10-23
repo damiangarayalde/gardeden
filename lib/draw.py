@@ -106,6 +106,16 @@ class Drawer:
         sy = y * self.scale + self.offset[1]
         return sx, sy
 
+    def world_to_display(self, pt, mode="zenital", observer=None):
+        """Map a world point to screen coords, top-down or projected through the observer."""
+        if mode == "zenital":
+            return self.map_to_screen(pt[0], pt[1])
+        u_img, v_img = observer.world_to_image(pt)  # world → image
+        screen_w, screen_h = self.screen.get_size()
+        img_w, img_h = observer.frame_size
+        return (int(u_img * screen_w / img_w),      # image → screen
+                int(v_img * screen_h / img_h))
+
     def draw_robot(self, robot_pose,
                    robot_rear_lights=False,
                    robot_tracking_enabled=False,
@@ -135,15 +145,7 @@ class Drawer:
 
         # --- Helper: world → display (screen) coords ---
         def world_to_display(pt):
-            if mode == "zenital":
-                return self.map_to_screen(pt[0], pt[1])
-            else:  # camera mode
-                u_img, v_img = observer.world_to_image(pt)  # world → image
-                screen_w, screen_h = self.screen.get_size()
-                img_w, img_h = observer.frame_size
-                u_scr = int(u_img * screen_w / img_w)       # image → screen
-                v_scr = int(v_img * screen_h / img_h)
-                return (u_scr, v_scr)
+            return self.world_to_display(pt, mode, observer)
 
         # --- robot body ---
         body_corners_world = [
@@ -261,25 +263,15 @@ class Drawer:
                 raise ValueError(
                     "observer is required for camera projection mode")
 
-            # Get scaling factors from image coords → screen coords
-            screen_w, screen_h = self.screen.get_size()
-            img_w, img_h = observer.frame_size
-
-            path_points = []
-            for x, y, *_ in job_path:
-                u_img, v_img = observer.world_to_image((x, y))  # world → image
-                # image → screen
-                u_scr = int(u_img * screen_w / img_w)
-                v_scr = int(v_img * screen_h / img_h)
-                path_points.append((u_scr, v_scr))
+            path_points = [self.world_to_display((x, y), mode, observer)
+                           for x, y, *_ in job_path]
 
         else:
             raise ValueError("mode must be 'zenital' or 'camera'")
 
         # --- Draw path ---
 
-        color = (100, 100, 255, 200) if mode == "camera" else (
-            100, 100, 255, 200)
+        color = (100, 100, 255, 200)
 
         # draw on an SRCALPHA surface then blit to preserve translucency
         overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
@@ -322,15 +314,7 @@ class Drawer:
 
         # --- Helper: world → display coords ---
         def world_to_display(pt):
-            if mode == "zenital":
-                return self.map_to_screen(pt[0], pt[1])
-            else:  # camera mode
-                u_img, v_img = observer.world_to_image(pt)  # world → image
-                screen_w, screen_h = self.screen.get_size()
-                img_w, img_h = observer.frame_size
-                u_scr = int(u_img * screen_w / img_w)       # image → screen
-                v_scr = int(v_img * screen_h / img_h)
-                return (u_scr, v_scr)
+            return self.world_to_display(pt, mode, observer)
 
         # --- Convert path points ---
         path_points = [world_to_display((x, y)) for x, y in walked_path]

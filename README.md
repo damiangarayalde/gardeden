@@ -112,7 +112,8 @@ lib/
   CommModule.py          UDP/JSON link to the robot's ESP32
 configs/                 YAML configuration
 snapshot.jpg             reference photo of the garden used for the camera view
-tests/                   experiments (ArUco marker detection, notebooks)
+tests/                   pytest suite (`python -m pytest`)
+experiments/             ArUco marker detection, notebooks
 ```
 
 ## Roadmap
@@ -121,7 +122,7 @@ Roughly in order:
 
 1. **Close the loop on hardware.** Send the input dict to the ESP32 (the call is already in `main.py`, commented out) and drive the real chassis from the same joystick.
 2. **Live camera instead of a snapshot.** Swap the static `snapshot.jpg` for the live feed from the security camera that already watches the garden. I've confirmed I can reach it from custom software.
-3. **Vision-based localization (optional closed loop).** Detect ArUco markers on the robot (early experiments are in [tests/](tests/)) and feed the measured pose back into the controller, so it no longer relies only on dead reckoning.
+3. **Vision-based localization (optional closed loop).** Detect ArUco markers on the robot (early experiments are in [experiments/](experiments/)) and feed the measured pose back into the controller, so it no longer relies only on dead reckoning.
 4. **Real lawn shapes.** Handle non-rectangular areas and obstacles, not only a rectangle.
 5. **Safety.** Blade cutoff, a communication-loss failsafe, and keeping the robot inside the lawn boundary.
 
@@ -131,7 +132,7 @@ Roughly in order:
 - **Units:** meters and seconds in the world, and degrees for the robot heading. The path planner works in radians internally.
 - **Adding an input:** emit a new key in `UserInputManager`, then handle it in `Robot.apply_inputs()`. Since the robot reads the same dict, that key will also work over UDP once comms are live.
 - **Tuning:** most behavior is in `configs/robot.yml`, so try changing it there before editing code.
-- **Branches:** `main` should always run. Please put experiments on a branch or under `tests/`.
+- **Branches:** `main` should always run. Please put experiments on a branch or under `experiments/`.
 
 ## Tech
 

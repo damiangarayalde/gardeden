@@ -14,7 +14,7 @@ drawer = Drawer("configs/graphics.yml", robot, camera_mode="camera")
 # [[980, 1234], [880, 120], [1367, 102], [2145, 1001]]
 predefined_points = [[980, 1234], [920, 646], [1354, 617], [1561, 1125]]
 observer = Observer(predefined_points=predefined_points, screen=drawer.screen)
-ui = UserInputManager(comm_module=comm, debug=True)
+ui = UserInputManager(debug=True)
 FPS = 20
 running = True
 

@@ -1,5 +1,5 @@
 import pygame
-from typing import Optional, Dict, Any
+from typing import Dict, Any, Tuple
 
 JS_BTN_OPTIONS = 6
 JS_BTN_START = 5
@@ -13,17 +13,9 @@ JS_AXIS_RIGHT_VERTICAL = 3
 
 
 class UserInputManager:
-    """
-    Shadow implementation that centralizes keyboard, joystick and external-comm
-    inputs. Keep existing standalone functions (keyboard_to_kv, joystick_axes_to_kv)
-    untouched — this class is additive so you can enable it incrementally.
-    """
+    """Centralizes keyboard and joystick inputs into a single key/value dict."""
 
-    def __init__(self,
-                 comm_module: Optional[Any] = None,
-                 deadzone: float = 0.2,
-                 debug: bool = False):
-       # self.comm = comm_module
+    def __init__(self, deadzone: float = 0.2, debug: bool = False):
         self.deadzone = deadzone
         self.debug = debug
 
@@ -128,43 +120,13 @@ class UserInputManager:
         return mapping.get(key, {})
 
     # -------------------------
-    # Comm/external helpers
-    # -------------------------
-    # def comm_to_kv(self) -> Dict[str, Any]:
-    #     """Poll provided comm module for key-value inputs. Supports comm.read_kv() or comm.poll()."""
-    #     if self.comm is None:
-    #         return {}
-    #     # try common method names without raising
-    #     if hasattr(self.comm, "read_kv"):
-    #         try:
-    #             return self.comm.read_kv() or {}
-    #         except Exception:
-    #             return {}
-    #     if hasattr(self.comm, "poll"):
-    #         try:
-    #             return self.comm.poll() or {}
-    #         except Exception:
-    #             return {}
-    #     return {}
-
-    # -------------------------
     # High level poll
     # -------------------------
-    def check_for_inputs(self) -> Dict[str, Any]:
+    def check_for_inputs(self) -> Tuple[Dict[str, Any], bool]:
         """
-        Merge keyboard, joystick and comm inputs into a single dict.
-        Order: comm <- keyboard <- joystick (joystick overrides keyboard, keyboard overrides comm).
+        Merge keyboard and joystick inputs into a single dict (joystick overrides keyboard).
+        Returns (inputs, running); running is False once the window is closed.
         """
-        # inputs: Dict[str, Any] = {}
-        # # merged.update(self.comm_to_kv())
-        # inputs.update(self._keyboard_to_kv())
-        # inputs.update(self._joystick_axes_to_kv())
-        # if self.debug and inputs:
-        #     print("check_for_inputs run successfully with output:", inputs)
-        # return inputs
-
-        # Check for inputs: local (keyboard or joystick + remote)
-
         inputs = {}
         running = True
 
@@ -181,25 +143,3 @@ class UserInputManager:
             inputs.update(self._joystick_axes_to_kv())
 
         return inputs, running
-
-        # -------------------------------------------------------------------
-        # Handle incoming data from surrogate robot (remote inputs)
-        # remote_inputs = comm.receive()
-        # if remote_inputs:
-        #     print("Remote inputs:", remote_inputs)
-
-    # -------------------------
-    # Utilities
-    # -------------------------
-
-    def set_joystick(self, joystick: pygame.joystick.Joystick):
-        self.joystick = joystick
-
-    def set_comm(self, comm_module: Any):
-        self.comm = comm_module
-
-    def set_deadzone(self, deadzone: float):
-        self.deadzone = deadzone
-
-    def set_debug(self, enabled: bool):
-        self.debug = enabled

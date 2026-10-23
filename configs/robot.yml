@@ -15,5 +15,4 @@ robot:
   overlap: 0.1
   paused_at_beginning: True
   tracking_enabled: False
-  cruise_speed: 0.01
   horn: False

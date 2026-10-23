@@ -25,6 +25,7 @@ class Observer:
 
         self.clicked_points = []
         self.H = None
+        self.H_inv = None
         self.mask = None
         self.calibrated = False
 
@@ -57,6 +58,7 @@ class Observer:
         """Calibrate using predefined 4 image points → world coords."""
         pts_image = np.array(self.clicked_points, dtype=np.float32)
         self.H, self.mask = cv2.findHomography(pts_image, self.pts_world)
+        self.H_inv = np.linalg.inv(self.H)  # cached: world_to_image runs per point per frame
         self.calibrated = True
         print("Calibration complete using predefined points!")
 
@@ -75,9 +77,8 @@ class Observer:
         """Map real-world (x,y) to image pixel (u,v)."""
         if self.H is None:
             raise ValueError("Homography not calibrated yet")
-        H_inv = np.linalg.inv(self.H)
         xy1 = np.array([point[0], point[1], 1.0])
-        uv1 = H_inv @ xy1
+        uv1 = self.H_inv @ xy1
         uv1 /= uv1[2]
         return int(uv1[0]), int(uv1[1])
 

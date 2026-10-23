@@ -2,6 +2,8 @@ import math
 import yaml
 from lib.path import get_job_path
 
+WALKED_PATH_MIN_STEP = 0.01  # m, minimum movement before a new walked_path point is recorded
+
 
 def normalize_angle(angle_deg: float) -> float:
     """Normalize an angle to the range [-180, 180) degrees."""
@@ -39,7 +41,6 @@ class RobotState:
         self.walked_path = [(self.x, self.y)]
         self.paused = config["paused_at_beginning"]
         self.tracking_enabled = config["tracking_enabled"]
-        self.cruise_speed = config["cruise_speed"]
         self.horn = config["horn"]
 
 
@@ -81,7 +82,10 @@ class Robot:
         """Update the robot's current pose."""
         self.state.x, self.state.y, self.state.heading_deg = pose
         self.state.heading_deg = normalize_angle(self.state.heading_deg)
-        self.state.walked_path.append((self.state.x, self.state.y))
+        # Only record real movement, otherwise the path (and redraw cost) grows every frame
+        last_x, last_y = self.state.walked_path[-1]
+        if math.hypot(self.state.x - last_x, self.state.y - last_y) >= WALKED_PATH_MIN_STEP:
+            self.state.walked_path.append((self.state.x, self.state.y))
 
     def get_pose(self):
         """Return the current pose (x, y, heading_deg)."""
@@ -109,7 +113,11 @@ class Robot:
         self.state.paused = not self.state.paused
         print(f"Paused: {self.state.paused}")
         if self.state.paused:
+            # Heading is integrated from the wheel speeds, so those must stop too
             self.state.speed = 0.0
+            self.state.target_speed = 0.0
+            self.state.angular_speed = 0.0
+            self._update_wheel_speeds(0.0)
 
     def toggle_tracking(self):
         self.state.tracking_enabled = not self.state.tracking_enabled
@@ -138,9 +146,6 @@ class Robot:
             self.state.angular_speed = omega_percent * max_omega
             self._update_wheel_speeds(self.state.angular_speed)
 
-    # def set_world_space(self, rect):
-    #     self.world_rect = rect
-
     def apply_lateral_disturbance(self, displacement: float):
         """Simulate a lateral displacement disturbance."""
         self.state.y += displacement
@@ -164,7 +169,7 @@ class Robot:
         """
 
         # Analog inputs
-        if "speed_percent" in inputs or "omega" in inputs:
+        if "speed_percent" in inputs or "omega_percent" in inputs:
             self._apply_analog(inputs)
 
         # Discrete keyboard-like commands
@@ -185,11 +190,8 @@ class Robot:
         if inputs.get("disturb_right"):
             self.apply_lateral_disturbance(-self.specs.lateral_disturbance)
         if inputs.get("horn_pressed"):
-            print("horn__PRESSSEDDDD")
             self.state.horn = True
         if inputs.get("horn_released"):
-            print("horn_______________________________reeeeeleaaaased")
-
             self.state.horn = False
 
     def _apply_analog(self, inputs: dict):
@@ -251,12 +253,6 @@ class Robot:
 
     def run_controller(self):
         """Update the robot state based on sensors and user input."""
-
-        # printf("\033[A"); // ESC[A moves the cursor up one line
-        # printf("\033[2K");
-        # print(
-        # f'speed: {100*self.state.speed:.2f} m/s, target speed: {100*self.state.target_speed:.2f} m/s, angular speed: {100*self.state.angular_speed:.2f} rad/s')
-
         # run the path following controller
         if self.state.tracking_enabled:
             self.pure_pursuit()
