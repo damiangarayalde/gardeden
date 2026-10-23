@@ -1,5 +1,6 @@
 # ====== Network settings ======
 network:
+  enabled: false  # true → send every input dict to the ESP32 over UDP
   ESP32_IP: '192.168.0.16'
   ESP32_PORT: 4210
   LOCAL_IP: '0.0.0.0' # listen on all interfaces

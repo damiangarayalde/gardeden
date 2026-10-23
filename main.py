@@ -1,29 +1,38 @@
 import pygame
+import yaml
 from lib.RobotController import Robot
 from lib.draw import Drawer
 from lib.CommModule import CommModule
 from lib.RealWorldObserver import Observer
 from lib.UserInputManager import UserInputManager
 
+FPS = 20
+
 # ------------------------------ Init
+with open("configs/comms.yml") as f:
+    comms_enabled = yaml.safe_load(f)["network"]["enabled"]
+with open("configs/camera.yml") as f:
+    camera_cfg = yaml.safe_load(f)["camera"]
+
 pygame.init()
 clock = pygame.time.Clock()
-comm = CommModule("configs/comms.yml")
+comm = CommModule("configs/comms.yml") if comms_enabled else None
 robot = Robot("configs/robot.yml")
 drawer = Drawer("configs/graphics.yml", robot, camera_mode="camera")
-# [[980, 1234], [880, 120], [1367, 102], [2145, 1001]]
-predefined_points = [[980, 1234], [920, 646], [1354, 617], [1561, 1125]]
-observer = Observer(predefined_points=predefined_points, screen=drawer.screen)
+observer = Observer(world_rect=robot.world_rect,
+                    snapshot_path=camera_cfg["snapshot"],
+                    predefined_points=camera_cfg["calibration_points"],
+                    screen=drawer.screen)
 ui = UserInputManager(debug=True)
-FPS = 20
 running = True
 
 while running:
 
-    inputs, running = ui.check_for_inputs()  # keyboard + joystick + comm
+    inputs, running = ui.check_for_inputs()  # keyboard + joystick
 
     if inputs:
-        # comm.send(inputs) # Send surrogate robot latest inputs ...
+        if comm:
+            comm.send(inputs)  # Send surrogate robot latest inputs ...
         # ... and apply those to the local robot model
         robot.apply_inputs(inputs)
 
@@ -31,7 +40,7 @@ while running:
     robot.run_controller()
 
     # Update pose based on sensors and/or models
-    if (pose := robot.estimate_next_pose(dt=1.0)) is not None:
+    if (pose := robot.estimate_next_pose(dt=1.0 / FPS)) is not None:
         robot.set_pose(pose)
 
     # Render simulation and observer view
