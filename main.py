@@ -35,6 +35,7 @@ while running:
             comm.send(inputs)  # Send surrogate robot latest inputs ...
         # ... and apply those to the local robot model
         robot.apply_inputs(inputs)
+        drawer.show_inputs(inputs)  # flash the command on the HUD
 
     # Update direction based on target path and current pose
     robot.run_controller()

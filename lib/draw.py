@@ -4,6 +4,21 @@ import numpy as np
 import yaml
 import time
 
+# On-screen label for each discrete input, flashed on the HUD so a silent video shows
+# what was pressed (analog joystick axes are left out: they change every frame)
+INPUT_LABELS = {
+    "toggle_pause": "Pause / resume",
+    "toggle_tracking": "Auto mode toggled",
+    "faster": "Speed +",
+    "slower": "Speed -",
+    "turn_left": "Steer left",
+    "turn_right": "Steer right",
+    "disturb_left": "Push left (disturbance)",
+    "disturb_right": "Push right (disturbance)",
+    "horn_pressed": "Horn",
+}
+TOAST_SECONDS = 1.5
+
 
 class Drawer:
     def __init__(self, initial_config, robot, camera_mode="camera"):
@@ -27,6 +42,9 @@ class Drawer:
         self.offset = (0, 0)
         self.font = pygame.font.SysFont("Arial", 14)  # SysFont lookup is slow, do it once
         self._job_path_cache = {}
+        self.hud_font_big = pygame.font.SysFont("Arial", 26, bold=True)
+        self.hud_font = pygame.font.SysFont("Arial", 19)
+        self._toast = None  # (text, time shown)
         self.screen = pygame.display.set_mode(
             self.window_size, pygame.RESIZABLE)
         self.robot = robot
@@ -484,5 +502,65 @@ class Drawer:
             # Draw only camera view
             self._draw_camera_view(robot, observer)
 
+        self.draw_hud(robot)
+
         # Finally update the display
         pygame.display.flip()
+
+    def show_inputs(self, inputs):
+        """Flash the latest discrete command on the HUD."""
+        labels = [INPUT_LABELS[k] for k, v in inputs.items() if v and k in INPUT_LABELS]
+        if labels:
+            self._toast = (" + ".join(labels), time.time())
+
+    def draw_hud(self, robot):
+        """Status panel (top-left) readable in a silent screen recording."""
+        state = robot.state
+        auto = state.tracking_enabled
+        if robot.first_uncovered_index() is None:
+            activity = "Job complete"
+        elif not auto:
+            activity = "Driving by hand"
+        elif robot.approach_path is not None:
+            activity = "Returning to uncut grass"
+        else:
+            activity = "Following mowing path"
+        required = robot.required.sum()
+        cut_pct = 100 * (robot.covered & robot.required).sum() / required if required else 100
+
+        white, grey = (230, 230, 230), (180, 180, 180)
+        rows = [  # (text, font, color) or (label, value, color) for the two-column rows
+            ("AUTO" if auto else "MANUAL", self.hud_font_big,
+             (90, 220, 110) if auto else (255, 170, 60)),
+            ("PAUSED" if state.paused else "RUNNING", self.hud_font_big,
+             (255, 80, 80) if state.paused else white),
+            ("Set speed", f"{state.target_speed:.2f} m/s", white),
+            ("Actual", f"{state.speed:.2f} m/s", grey),
+            (activity, self.hud_font, white),
+            ("Lawn cut", f"{cut_pct:.0f}%", grey),
+        ]
+        if self._toast and time.time() - self._toast[1] < TOAST_SECONDS:
+            rows.append((f"> {self._toast[0]}", self.hud_font, (255, 220, 90)))
+
+        # Render; two-column rows get their value aligned in a second column
+        rendered = []
+        for a, b, color in rows:
+            if isinstance(b, str):
+                rendered.append((self.hud_font.render(a, True, color),
+                                 self.hud_font.render(b, True, color)))
+            else:
+                rendered.append((b.render(a, True, color), None))
+        pad, gap, col_gap = 12, 4, 18
+        value_x = pad + max(lbl.get_width() for lbl, val in rendered if val) + col_gap
+        w = max(value_x + val.get_width() if val else pad + lbl.get_width()
+                for lbl, val in rendered) + pad
+        h = sum(lbl.get_height() for lbl, _ in rendered) + gap * (len(rendered) - 1) + 2 * pad
+        panel = pygame.Surface((w, h), pygame.SRCALPHA)
+        panel.fill((0, 0, 0, 170))
+        y = pad
+        for lbl, val in rendered:
+            panel.blit(lbl, (pad, y))
+            if val:
+                panel.blit(val, (value_x, y))
+            y += lbl.get_height() + gap
+        self.screen.blit(panel, (12, 12))

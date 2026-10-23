@@ -290,3 +290,22 @@ def test_gives_up_on_unreachable_waypoint(robot):
     robot._mark_covered = mark_all_but_unreachable
     run_job(robot)  # must terminate instead of circling back forever
     assert robot.given_up[unreachable] and robot.given_up.sum() == 1
+
+
+# --- Rendering ---------------------------------------------------------------------
+
+def test_renders_every_view_with_hud(robot, monkeypatch):
+    monkeypatch.setenv("SDL_VIDEODRIVER", "dummy")  # headless, also on CI
+    import pygame
+    from lib.draw import Drawer
+    from lib.RealWorldObserver import Observer
+    pygame.init()
+    try:
+        for mode in ("zenital", "camera", "both"):
+            drawer = Drawer(str(ROOT / "configs/graphics.yml"), robot, camera_mode=mode)
+            obs = Observer(robot.world_rect, str(ROOT / "snapshot.jpg"), CALIBRATION_POINTS)
+            drawer.show_inputs({"toggle_tracking": 1, "speed_percent": 40})
+            assert drawer._toast[0] == "Auto mode toggled"  # analog axes aren't flashed
+            drawer.draw_scene(robot, obs)
+    finally:
+        pygame.quit()
