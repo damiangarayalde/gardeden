@@ -31,6 +31,7 @@ class RobotSpecs:
         self.angle_step = config["angle_step"]              # rad/s per keypress
         self.max_speed = config["max_speed"]                # m/s at full joystick
         self.max_angular_speed = config["max_angular_speed"]  # rad/s at full joystick
+        self.max_lateral_accel = config["max_lateral_accel"]  # m/s², auto mode slows for curves
         self.turn_radius = config.get("turn_radius", 0.2)
         self.overlap = config.get("overlap", 0.2)
 
@@ -331,6 +332,12 @@ class Robot:
         kappa = (2 * local_y) / (Ld * Ld) if Ld > 1e-6 else 0.0
         max_kappa = 1.0 / self.specs.turn_radius
         kappa = max(-max_kappa, min(max_kappa, kappa))
+
+        # Slow down for curves: the user's speed is a ceiling, cornering v²·kappa is capped
+        speed = self.state.target_speed
+        if abs(kappa) > 1e-9:
+            speed = min(speed, math.sqrt(self.specs.max_lateral_accel / abs(kappa)))
+        self.state.speed = speed
 
         # desired angular velocity
         omega = self.state.speed * kappa

@@ -31,7 +31,7 @@ def start_tracking(robot, pose, speed):
     robot.set_pose(pose)
     with contextlib.redirect_stdout(io.StringIO()):
         robot.toggle_tracking()
-    robot.state.speed = speed
+    robot.state.target_speed = robot.state.speed = speed
 
 
 def lane_ys(robot):
@@ -127,7 +127,7 @@ def test_pure_pursuit_recovers_from_push(robot):
     assert robot.get_pose()[1] == pytest.approx(lane_y, abs=0.02)
 
 
-@pytest.mark.parametrize("speed", [0.2, 0.4])
+@pytest.mark.parametrize("speed", [0.2, 0.4, 0.6])  # 0.6 relies on slowing for curves
 def test_completes_whole_job_on_path(robot, speed):
     x0, y0, th0 = robot.job_path[0]
     start_tracking(robot, (x0, y0, math.degrees(th0)), speed)
@@ -159,7 +159,7 @@ def test_resume_returns_to_first_uncut_waypoint(robot):
         robot.toggle_tracking()                # take over manually...
         robot.set_pose((2.5, 1.2, 90.0))       # ...and leave the robot somewhere else
         robot.toggle_tracking()                # back to auto
-    robot.state.speed = 0.4
+    robot.state.target_speed = robot.state.speed = 0.4
     assert robot.approach_path is not None
     rx, ry, _ = robot.job_path[resume]
     max_omega = robot.state.speed / robot.specs.turn_radius  # tightest physical turn
@@ -224,3 +224,17 @@ def test_planned_path_cuts_whole_lawn_but_corners(robot):
     # Only the 4 corners stay uncut: a 0.2 m turn radius can't square them off
     xy = [(x, y) for x, y, _ in robot.job_path]
     assert lawn_coverage(robot.world_rect, xy, robot.specs.blade_diameter) > 0.99
+
+
+def test_auto_mode_slows_for_curves(robot):
+    # Job starts along the perimeter's bottom side, then turns up the first corner
+    x0, y0, th0 = robot.job_path[0]
+    start_tracking(robot, (x0, y0, math.degrees(th0)), speed=0.6)
+    speeds, headings = [], []
+    for _ in range(120):  # 6 s: the ~2.75 m straight, then the corner
+        step(robot)
+        speeds.append(robot.state.speed)
+        headings.append(robot.get_pose()[2])
+    in_corner = [v for v, h in zip(speeds, headings) if 20 < h < 70]
+    assert max(speeds) == pytest.approx(0.6)  # full speed on the straight
+    assert in_corner and max(in_corner) < 0.6 * 0.8  # clearly slower through the corner
