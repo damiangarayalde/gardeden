@@ -1,5 +1,6 @@
 import pygame
 import math
+import numpy as np
 import yaml
 import time
 
@@ -117,14 +118,30 @@ class Drawer:
         return (int(u_img * screen_w / img_w),      # image → screen
                 int(v_img * screen_h / img_h))
 
+    def world_to_display_many(self, points, mode="zenital", observer=None):
+        """Vectorized world_to_display: (N, 2) world points → (N, 2) float screen coords.
+        Long paths go through here: one numpy call instead of N Python-level projections."""
+        pts = np.asarray(points, dtype=float).reshape(-1, 2)
+        if mode == "zenital":
+            return pts * self.scale + self.offset
+        screen_w, screen_h = self.screen.get_size()
+        img_w, img_h = observer.frame_size
+        return observer.world_to_image_many(pts) * (screen_w / img_w, screen_h / img_h)
+
     def world_radius_to_px(self, center, radius, mode="zenital", observer=None):
         """On-screen radius of a world circle; in camera mode, averages perspective along x and y."""
+        return int(self.world_radii_to_px([center], radius, mode, observer)[0])
+
+    def world_radii_to_px(self, centers, radius, mode="zenital", observer=None):
+        """Vectorized world_radius_to_px for (N, 2) centers → (N,) int pixel radii."""
+        centers = np.asarray(centers, dtype=float).reshape(-1, 2)
         if mode == "zenital":
-            return max(1, int(radius * self.scale))
-        c = self.world_to_display(center, mode, observer)
-        rx = self.world_to_display((center[0] + radius, center[1]), mode, observer)
-        ry = self.world_to_display((center[0], center[1] + radius), mode, observer)
-        return max(1, int((math.dist(c, rx) + math.dist(c, ry)) / 2))
+            return np.full(len(centers), max(1, int(radius * self.scale)))
+        c = self.world_to_display_many(centers, mode, observer)
+        rx = self.world_to_display_many(centers + (radius, 0.0), mode, observer)
+        ry = self.world_to_display_many(centers + (0.0, radius), mode, observer)
+        r_px = (np.hypot(*(rx - c).T) + np.hypot(*(ry - c).T)) / 2
+        return np.maximum(1, r_px.astype(int))
 
     def draw_robot(self, robot_pose,
                    robot_rear_lights=False,
@@ -259,8 +276,8 @@ class Drawer:
         # --- Map world path to screen coordinates (static path: cached per view and size) ---
         cache_key = (mode, self.screen.get_size(), id(job_path))
         if cache_key not in self._job_path_cache:
-            self._job_path_cache[cache_key] = [
-                self.world_to_display((x, y), mode, observer) for x, y, *_ in job_path]
+            self._job_path_cache[cache_key] = self.world_to_display_many(
+                [(x, y) for x, y, *_ in job_path], mode, observer).tolist()
         path_points = self._job_path_cache[cache_key]
 
         # --- Draw path ---
@@ -275,7 +292,7 @@ class Drawer:
         approach = self.robot.approach_path
         if approach is not None and len(approach) > 1:
             pygame.draw.lines(overlay, (255, 200, 0, 220), False,
-                              [self.world_to_display(pt, mode, observer) for pt in approach], 2)
+                              self.world_to_display_many(approach, mode, observer).tolist(), 2)
         self.screen.blit(overlay, (0, 0))
 
         # --- Pick start, mid, end ---
@@ -309,16 +326,11 @@ class Drawer:
         if not walked_path or len(walked_path) < 2:
             return
 
-        # --- Helper: world → display coords ---
-        def world_to_display(pt):
-            return self.world_to_display(pt, mode, observer)
-
         # --- Convert path points ---
-        path_points = [world_to_display((x, y)) for x, y in walked_path]
+        path_points = self.world_to_display_many(walked_path, mode, observer).astype(int).tolist()
 
         # --- Blade coverage radius (per point: perspective shrinks it with distance) ---
-        blade_radii = [self.world_radius_to_px(pt, blade_diameter / 2, mode, observer)
-                       for pt in walked_path]
+        blade_radii = self.world_radii_to_px(walked_path, blade_diameter / 2, mode, observer).tolist()
 
         # --- Draw on transparent overlay to get 50% translucency ---
         overlay = pygame.Surface(self.screen.get_size(), pygame.SRCALPHA)
@@ -329,8 +341,7 @@ class Drawer:
 
         # Draw blade coverage circles onto overlay
         for pos, radius in zip(path_points, blade_radii):
-            pygame.draw.circle(overlay, coverage_color,
-                               (int(pos[0]), int(pos[1])), radius)
+            pygame.draw.circle(overlay, coverage_color, pos, radius)
 
         # Draw walked path line onto overlay
         if len(path_points) > 1:

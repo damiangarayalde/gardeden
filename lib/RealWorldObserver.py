@@ -78,6 +78,12 @@ class Observer:
         uv1 /= uv1[2]
         return int(uv1[0]), int(uv1[1])
 
+    def world_to_image_many(self, points):
+        """Vectorized world_to_image: (N, 2) world points → (N, 2) float image pixels."""
+        pts = np.asarray(points, dtype=float).reshape(-1, 2)
+        uvw = np.c_[pts, np.ones(len(pts))] @ self.H_inv.T
+        return uvw[:, :2] / uvw[:, 2:3]
+
     # -------------------------------------------------------------------------
     # Frame accessor
     # -------------------------------------------------------------------------
