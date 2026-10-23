@@ -1,0 +1,6 @@
+camera:
+  snapshot: snapshot.jpg
+  # Lawn corners in snapshot pixels, in this order: (x_min, y_min), (x_max, y_min),
+  # (x_max, y_max), (x_min, y_max) of world.rect in robot.yml.
+  # Set to null to click them on the image at startup (the console prints the result to paste here).
+  calibration_points: [[980, 1234], [920, 646], [1354, 617], [1561, 1125]]

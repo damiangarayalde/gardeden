@@ -24,6 +24,7 @@ class UserInputManager:
 
         pygame.joystick.init()
         self.joystick = None
+        self._last_axes_kv = None
 
         if pygame.joystick.get_count() > 0:
             self.joystick = pygame.joystick.Joystick(0)
@@ -40,12 +41,11 @@ class UserInputManager:
         return 0.0 if abs(v) < self.deadzone else v
 
     def _joystick_axes_to_kv(self) -> dict:
-        """Poll joystick axes every frame and return continuous inputs.
-            Map joystick buttons/axes to ControlInput.
-            Adjust mapping for Kolke KGJ-182 if needed.
-            Return raw joystick state as key-value dict.
-            Includes camera pan/tilt axes (mapped to percent).
-            """
+        """Poll joystick axes (-255..255 each, incl. camera pan/tilt).
+        Returns them only when they changed since the last poll, so a resting stick
+        doesn't overwrite keyboard speed/steering every frame. Mapping is for a
+        Kolke KGJ-182; adjust the JS_* constants for other pads.
+        """
 
         js = self.joystick
         if js is None:
@@ -73,6 +73,9 @@ class UserInputManager:
             # camera tilt (inverted)
             "cam_tilt_percent": int(-axis_tilt * 255),
         }
+        if kv == self._last_axes_kv:
+            return {}
+        self._last_axes_kv = kv
         if self.debug:
             print("joystick_axes_to_kv:", kv)
         return kv

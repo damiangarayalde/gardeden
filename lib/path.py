@@ -83,14 +83,25 @@ def get_job_path(cart, start_pose=None, row_heading=0.0, sample_step=0.01,
         raise ValueError(
             "Invalid lane spacing (<=0). Check blade diameter/overlap.")
 
-# Force first row at half blade above bottom
-    rows = np.arange(y_min_allowed + blade_ef_diam / 2.0,
-                     y_max_allowed + 1e-9,
-                     spacing)
-
-    if rows.size == 0:
-        # Fallback to a single row centered in the allowed Y-range
+    # First and last rows sit half a blade inside the edges, so the blade never leaves
+    # the lawn; rows in between are spread evenly at <= spacing so coverage never shrinks
+    y_first = y_min_allowed + blade_ef_diam / 2.0
+    y_last = y_max_allowed - blade_ef_diam / 2.0
+    if y_last <= y_first:
+        # Lawn narrower than the blade: single row centered in the allowed Y-range
         rows = np.array([(y_min_allowed + y_max_allowed) / 2.0])
+    else:
+        n_rows = math.ceil((y_last - y_first) / spacing - 1e-9) + 1
+        rows = np.linspace(y_first, y_last, n_rows)
+
+    # Rows closer than 2*turn_radius force U-turns that bulge past the lane end:
+    # measure one and inset the lane ends by at least that much
+    if len(rows) > 1:
+        u_turn = dubins_segment((0.0, 0.0, 0.0), (0.0, rows[1] - rows[0], math.pi),
+                                turn_radius, step=sample_step)
+        bulge = max(x for x, _, _ in u_turn)
+        x_min_allowed = max(x_min_allowed, x_min_ext + bulge)
+        x_max_allowed = min(x_max_allowed, x_max_ext - bulge)
 
     def lane_endpoints(y, east=True):
         # heading for east lanes is row_heading, for west lanes row_heading + pi

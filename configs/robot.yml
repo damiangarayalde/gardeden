@@ -9,8 +9,10 @@ robot:
   blade_diameter: 0.35
   distance_between_wheels: 0.45
   lateral_disturbance: 0.2
-  angle_step: 0.02
-  speed_step: 0.01
+  speed_step: 0.2          # m/s added per W/S keypress
+  angle_step: 0.4          # rad/s added per A/D keypress
+  max_speed: 0.4           # m/s at full joystick deflection
+  max_angular_speed: 0.8   # rad/s at full joystick deflection
   turn_radius: 0.2
   overlap: 0.1
   paused_at_beginning: True

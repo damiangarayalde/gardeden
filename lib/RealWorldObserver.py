@@ -1,27 +1,24 @@
 import numpy as np
 import cv2
-import yaml
 import pygame
 
 
 class Observer:
     """Homography, calibration of work field, custom transformation from image to real world, AR overlay with pygame."""
 
-    def __init__(self, snapshot_path="snapshot.jpg", predefined_points=None, screen=None):
-
-        # Adjust units (cm, m, etc.)
+    def __init__(self, world_rect, snapshot_path="snapshot.jpg", predefined_points=None, screen=None):
+        """
+        world_rect: lawn [x_min, y_min, x_max, y_max] in meters (same as configs/robot.yml).
+        predefined_points: the 4 lawn corners in image pixels, in the order of pts_world
+        below. None → click them on the snapshot.
+        """
+        x_min, y_min, x_max, y_max = world_rect
         self.pts_world = np.array([
-            [0, 0],    # bottom-left
-            [3.5, 0],  # top-left
-            [3.5, 2.1],  # top-right
-            [0, 2.1]  # bottom-right
+            [x_min, y_min],
+            [x_max, y_min],
+            [x_max, y_max],
+            [x_min, y_max],
         ], dtype=np.float32)
-        # self.pts_world = np.array([
-        #     [0, 0],    # bottom-left
-        #     [12.7, 0],  # top-left
-        #     [12.7, 4.8],  # top-right
-        #     [0, 4.8]  # bottom-right
-        # ], dtype=np.float32)
 
         self.clicked_points = []
         self.H = None
@@ -42,17 +39,16 @@ class Observer:
         self.background_surface = pygame.image.frombuffer(
             frame_rgb.tobytes(), (w, h), "RGB")
 
-        # Convert to pixel array for math if needed
-        self.frame_size = self.background_surface.get_size()
-
         if predefined_points is not None:
-            if len(predefined_points) == 4:
-                self.clicked_points = predefined_points
-                self.calibrate_with_points()
-            else:
-                print("Error: Predefined points must contain exactly 4 points")
+            if len(predefined_points) != 4:
+                raise ValueError(
+                    f"Calibration needs exactly 4 points, got {len(predefined_points)}")
+            self.clicked_points = predefined_points
+            self.calibrate_with_points()
         else:
             self.run_calibration(screen)
+            if not self.calibrated:
+                raise SystemExit("Calibration cancelled")
 
     def calibrate_with_points(self):
         """Calibrate using predefined 4 image points → world coords."""
@@ -60,7 +56,7 @@ class Observer:
         self.H, self.mask = cv2.findHomography(pts_image, self.pts_world)
         self.H_inv = np.linalg.inv(self.H)  # cached: world_to_image runs per point per frame
         self.calibrated = True
-        print("Calibration complete using predefined points!")
+        print(f"Calibration complete. Image points: {[list(p) for p in self.clicked_points]}")
 
     # -------------------------------------------------------------------------
     # Coordinate transforms
@@ -88,12 +84,15 @@ class Observer:
     def get_background_surface(self, size=None):
         """
         Return a pygame.Surface of the latest camera snapshot.
-        If size is provided, return a resized copy.
+        If size is provided, return a resized version (cached: don't draw on it).
         """
-        surface = self.background_surface.copy()
-        if size is not None:
-            surface = pygame.transform.smoothscale(surface, size)
-        return surface
+        if size is None:
+            return self.background_surface.copy()
+        # smoothscale of the full-res snapshot is costly; redo it only when the size changes
+        if getattr(self, "_scaled_bg_size", None) != size:
+            self._scaled_bg = pygame.transform.smoothscale(self.background_surface, size)
+            self._scaled_bg_size = size
+        return self._scaled_bg
 
     # -------------------------------------------------------------------------
     # Calibration with mouse clicks
@@ -113,11 +112,6 @@ class Observer:
                 if event.type == pygame.QUIT:
                     running = False
 
-                # elif event.type == pygame.VIDEORESIZE:
-                #     # Recreate resizable window with new size
-                #     screen = pygame.display.set_mode(
-                #         (event.w, event.h), pygame.RESIZABLE)
-
                 elif event.type == pygame.MOUSEBUTTONDOWN and not self.calibrated:
                     if len(self.clicked_points) < 4:
                         # Convert from SCREEN coords → IMAGE coords
@@ -132,6 +126,7 @@ class Observer:
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN and len(self.clicked_points) == 4:
                         self.calibrate_with_points()
+                        running = False
                     elif event.key == pygame.K_ESCAPE:
                         running = False
 

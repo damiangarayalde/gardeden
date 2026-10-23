@@ -25,7 +25,7 @@ class CommModule:
         # UDP socket
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind((bind_ip, udp_port))
-        self.sock.settimeout(0.2)  # non-blocking-ish
+        self.sock.setblocking(False)  # receive() is polled from the 20 Hz main loop
 
         print(f"[CommModule] Listening on {bind_ip}:{udp_port}")
 
@@ -51,7 +51,7 @@ class CommModule:
             kv = json.loads(msg)
             print(f"[CommModule] Received from {addr}: {kv}")
             return kv
-        except socket.timeout:
+        except BlockingIOError:  # nothing waiting
             return {}
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
             print(f"[CommModule] Invalid JSON received: {e}")
