@@ -206,3 +206,21 @@ def test_search_window_follows_waypoint_spacing(robot):
                                         safety_buffer=robot.specs.turn_radius + 0.2))
         window_m = robot._search_window * sample_step
         assert window_m == pytest.approx(1.0, abs=2 * sample_step)  # ceil + sampling jitter
+
+
+def lawn_coverage(world_rect, blade_xy, blade_diameter, res=0.02):
+    """Fraction of the lawn (on a res grid) within half a blade of any blade position."""
+    x0, y0, x1, y1 = world_rect
+    gx, gy = np.meshgrid(np.arange(x0 + res / 2, x1, res), np.arange(y0 + res / 2, y1, res))
+    cells = np.c_[gx.ravel(), gy.ravel()]
+    cut = np.zeros(len(cells), bool)
+    pts = np.asarray(blade_xy)[::2]
+    for chunk in np.array_split(pts, max(1, len(pts) // 200)):
+        cut |= (((cells[:, None] - chunk[None]) ** 2).sum(-1) <= (blade_diameter / 2) ** 2).any(1)
+    return cut.mean()
+
+
+def test_planned_path_cuts_whole_lawn_but_corners(robot):
+    # Only the 4 corners stay uncut: a 0.2 m turn radius can't square them off
+    xy = [(x, y) for x, y, _ in robot.job_path]
+    assert lawn_coverage(robot.world_rect, xy, robot.specs.blade_diameter) > 0.99

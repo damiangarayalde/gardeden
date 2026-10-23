@@ -24,8 +24,14 @@ def dubins_segment(q0, q1, turn_radius, step=0.5):
     return [(x, y, angle_wrap(yaw)) for (x, y, yaw) in configs]
 
 
+def connect_poses(q0, q1, turn_radius, step):
+    """Dubins segment q0 → q1; returns (poses, last pose)."""
+    seg = dubins_segment(q0, q1, turn_radius, step=step)
+    return seg, seg[-1]
+
+
 def get_job_path(cart, start_pose=None, row_heading=0.0, sample_step=0.01,
-                 margin_x=0.0, margin_y=0.0, safety_buffer=None):
+                 margin_x=0.0, margin_y=0.0, safety_buffer=None, perimeter=True):
     """
     Generate Dubins mowing path inside a rectangle, allowing extension (margin)
     beyond the rectangle while ensuring Dubins arcs stay inside the allowed area.
@@ -34,6 +40,8 @@ def get_job_path(cart, start_pose=None, row_heading=0.0, sample_step=0.01,
       (positive -> extend outward).
     - safety_buffer: minimum inset from the allowed outer boundary to guarantee
       turn arcs fit; if None, defaults to cart.specs.turn_radius.
+    - perimeter: start with a loop around the edge (half a blade in), which cuts the
+      strips at the lane ends where the U-turns happen. Default flow only.
     """
 
     rect = cart.world_rect
@@ -131,10 +139,27 @@ def get_job_path(cart, start_pose=None, row_heading=0.0, sample_step=0.01,
     path_poses = []
     curr_pose = start_pose
 
+    # Perimeter loop, counter-clockwise from the bottom-left. Its bottom side runs along
+    # the first row, so it closes heading east straight into the first lane's start.
+    # ponytail: horizontal lanes only (row_heading=0), the only case anyone uses today
+    d, r = blade_ef_diam / 2.0, turn_radius
+    loop_start = (x_min_ext + d + r, y_min_ext + d, 0.0)
+    if perimeter and row_heading == 0.0 and go_east and abs(rows[0] - loop_start[1]) < 1e-9 \
+            and x_min_allowed >= loop_start[0]:
+        corners = [
+            (x_max_ext - d, y_min_ext + d + r, math.pi / 2),    # up the right side
+            (x_max_ext - d - r, y_max_ext - d, math.pi),        # left along the top
+            (x_min_ext + d, y_max_ext - d - r, -math.pi / 2),   # down the left side
+            loop_start,                                          # back along the bottom
+        ]
+        curr_pose = loop_start
+        path_poses.append(loop_start)
+        for corner in corners:
+            seg, curr_pose = connect_poses(curr_pose, corner, turn_radius, sample_step)
+            path_poses.extend(seg[1:])
+
     def connect(curr_pose, target_pose):
-        seg = dubins_segment(curr_pose, target_pose,
-                             turn_radius, step=sample_step)
-        return seg, seg[-1]
+        return connect_poses(curr_pose, target_pose, turn_radius, sample_step)
 
     for i, y in enumerate(rows):
         lane_dir_east = go_east if (i % 2 == 0) else not go_east
