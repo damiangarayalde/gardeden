@@ -189,3 +189,20 @@ def test_observer_rejects_wrong_point_count(robot):
     from lib.RealWorldObserver import Observer
     with pytest.raises(ValueError):
         Observer(robot.world_rect, str(ROOT / "snapshot.jpg"), CALIBRATION_POINTS[:3])
+
+
+def test_no_reversing_in_auto_mode(robot):
+    start_tracking(robot, robot.get_pose(), speed=0.0)
+    robot.apply_inputs({"speed_percent": -255})
+    assert robot.state.speed == 0
+    robot.apply_inputs({"slower": 1})
+    assert robot.state.speed == 0
+
+
+def test_search_window_follows_waypoint_spacing(robot):
+    from lib.path import get_job_path
+    for sample_step in (0.01, 0.02, 0.05):
+        robot.set_job_path(get_job_path(robot, sample_step=sample_step,
+                                        safety_buffer=robot.specs.turn_radius + 0.2))
+        window_m = robot._search_window * sample_step
+        assert window_m == pytest.approx(1.0, abs=2 * sample_step)  # ceil + sampling jitter

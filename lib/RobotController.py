@@ -4,8 +4,7 @@ import yaml
 from lib.path import get_job_path, dubins_segment
 
 WALKED_PATH_MIN_STEP = 0.01  # m, minimum movement before a new walked_path point is recorded
-# ponytail: fixed index window, assumes the planner's 0.01 m sample step (~1 m of path ahead)
-PURSUIT_SEARCH_WINDOW = 100
+PURSUIT_SEARCH_DISTANCE = 1.0  # m of path ahead of the last matched waypoint to search
 # m, a waypoint counts as cut once the blade center passes this close; keep it above the
 # controller's worst tracking error (~0.1 m) or normal driving leaves false "uncut" gaps
 COVERAGE_TOLERANCE = 0.1
@@ -138,14 +137,19 @@ class Robot:
     def change_speed(self, delta: float):
         """Increase/decrease target speed by delta."""
         if not self.state.paused:
-            self.state.target_speed += delta
-            self.state.speed = self.state.target_speed
+            self._set_target_speed(self.state.target_speed + delta)
 
     def set_speed_percent(self, percent: float):
         """Set target speed from joystick fraction [-1, 1] of max speed."""
         if not self.state.paused:
-            self.state.target_speed = percent * self.specs.max_speed
-            self.state.speed = self.state.target_speed
+            self._set_target_speed(percent * self.specs.max_speed)
+
+    def _set_target_speed(self, speed: float):
+        # Pure pursuit only steers correctly going forward, so no reversing in auto mode
+        if self.state.tracking_enabled:
+            speed = max(0.0, speed)
+        self.state.target_speed = speed
+        self.state.speed = speed
 
     def set_angular_rate(self, omega_percent: float):
         """Set angular velocity from joystick fraction [-1, 1] of max yaw rate."""
@@ -222,6 +226,10 @@ class Robot:
         self.job_path = job_path
         self._path_xy = np.array([(px, py) for px, py, *_ in job_path]).reshape(-1, 2)
         self.covered = np.zeros(len(job_path), dtype=bool)  # per waypoint: grass already cut
+        # Waypoint spacing → how many waypoints make up PURSUIT_SEARCH_DISTANCE of path
+        steps = np.hypot(*np.diff(self._path_xy, axis=0).T)
+        self._path_step = float(np.median(steps)) if steps.size else 0.01
+        self._search_window = max(2, math.ceil(PURSUIT_SEARCH_DISTANCE / self._path_step))
         self.current_path_index = 0
         self.approach_path = None   # transit path to the resume waypoint, (N, 2) array
         self._approach_xy = None    # approach_path + the job path after it (pursuit target)
@@ -257,13 +265,13 @@ class Robot:
         # Close by, pursuit along the job path joins it fine; a tiny Dubins detour just overshoots
         if math.hypot(rx - self.state.x, ry - self.state.y) > 2 * self.specs.turn_radius:
             q0 = (self.state.x, self.state.y, math.radians(self.state.heading_deg))
-            seg = dubins_segment(q0, (rx, ry, rth), self.specs.turn_radius, step=0.01)
+            seg = dubins_segment(q0, (rx, ry, rth), self.specs.turn_radius, step=self._path_step)
             self.approach_path = np.array([(px, py) for px, py, _ in seg])
             # Pursue the approach *continued* by the job path: if the approach just ended,
             # the carrot would collapse onto its last point right under the robot near the
             # handoff, and 2*y/Ld^2 would spike the steering (heading flip / bounce)
             self._approach_xy = np.vstack(
-                [self.approach_path, self._path_xy[resume:resume + PURSUIT_SEARCH_WINDOW]])
+                [self.approach_path, self._path_xy[resume:resume + self._search_window]])
             self._approach_index = 0
         print(f"Resuming at waypoint {resume}/{len(self.job_path)}")
 
@@ -303,7 +311,7 @@ class Robot:
 
         # Closest point, searched only ~1 m of path ahead of the last one: a global search
         # would snap to the neighbouring lane after a push, and progress never goes backwards
-        closest_index = self._closest_index(path_xy, (x, y), index, index + PURSUIT_SEARCH_WINDOW)
+        closest_index = self._closest_index(path_xy, (x, y), index, index + self._search_window)
 
         # find carrot point beyond lookahead
         carrot_x, carrot_y = path_xy[-1]
