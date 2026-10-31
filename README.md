@@ -11,7 +11,12 @@ Before putting blades on real hardware, I wanted a setup where I could design an
 This is an exploration project. It isn't trying to fix a particular bottleneck or beat an existing product. It's about understanding every piece of the system by building it myself.
 
 <!-- Demo video: on github.com, edit this README and drag the .mp4 file here. GitHub uploads it and inserts a link that plays inline. -->
-> 🎥 **Demo:** *(video coming soon)* Me driving the mower with a joystick over the camera view of the garden, then switching to auto mode so it follows the planned mowing path on its own.
+> 🎥 **Demo:** [(here)](https://github.com/user-attachments/assets/a0627e96-1dcb-4dc4-a3f6-ce10b043217f) Me driving the mower with a joystick over the camera view of the garden, then switching to auto mode so it follows the planned mowing path on its own.
+
+
+
+
+
 
 ---
 
